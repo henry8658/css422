@@ -32,9 +32,6 @@ START_ADDR:
     CMPI    #8,D1 ; if there is more than 8 digits of hex. It is out of bound long address
     BGT     ERROR 
     JSR     ATOI
-    BTST    #0,D1 ; check even or odd address
-    BNE     ERROR
-    MOVE.L  D2,START_ADDRESS ; save start address to variable start_address
     RTS
     
 END_ADDR:
@@ -68,7 +65,7 @@ REPEAT_OR_FINISH:
 ; TODO: convert int to HEX . Or user will input hex value? In second case, we need to develop a converter that does char to hex
 ATOI:
     CMP     #0,D1 ; check if there is char to process D1: length of string
-    
+    BEQ     FINISH_START_ADDR ; finish processing start address
     MOVE.B  (A1)+,D0 ; load one char to D0 to process
     SUB     #1,D1 ; decrement length of char D1: lengh of string
     CMPI    #$46,D0 ; Check if the hex value of char is more than F ($46)
@@ -78,12 +75,27 @@ ATOI:
     CMPI    #$39,D0 ; check if the hex value of char is less than 9 ($39)
     BGT     ERROR ; out of bound for char value 1-9
     CMPI    #$30,D0 ; check if the hex value of char is more than 0 ($30)
+    BGE     CONVERT_NUM_TO_HEX
+    BRA     ERROR ; otherwise error
     
     
 CONVERT_CHAR_TO_HEX:
+    LSL.L   #4,D2 ; shift 4 bits to append new hex
     SUBI    #$37,D0 ; subtract hex 37 to convert A-F to hex
+    ADD.B   D0,D2 ; load hex to D2 by adding
     BRA     ATOI
 
+CONVERT_NUM_TO_HEX: ; 
+    LSL.L   #4,D2 ; shift 4 bits to append new hex
+    SUBI    #$30,D0 ; subtract hex 30 to convert 1-9 to hex
+    ADD.B   D0,D2 ; load hex to D2 by adding
+    BRA     ATOI
+
+FINISH_START_ADDR:
+    BTST    #0,D1 ; check even or odd address
+    BNE     ERROR
+    MOVE.L  D2,START_ADDRESS ; save start address to variable start_address
+    RTS
 
 ERROR:
     LEA     ERROR_INPUT,A1 ; load error message
