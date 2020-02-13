@@ -16,7 +16,7 @@ START:                  ; first instruction of program
 USER_INPUT:
     JSR     START_ADDR
     JSR     END_ADDR
-    MOVE.L  END_ADDRESS,D0
+    MOVE.L  END_ADDRESS,D0 ; move end address to D0 to compare two addresses
     CMP     START_ADDRESS,D0 ; check if start address is smaller than end address
     BLE     ERROR
     BRA     DECODE_LOOP ; go to decode loop to process 
@@ -25,22 +25,25 @@ START_ADDR:
     LEA     INPUT_START,A1 ; load message on A1
     MOVE.B  #14,D0 ; read char at A1 until null
     TRAP    #15 ; excute command code at D0
-    MOVE.B  #4,D0 ; read input num
-    TRAP    #15 
-    CMP     #0,D1 ; is ascii or negative int
-    BLE     ERROR ; negative int 
-    BTST    #0,D1 ; even or odd
+    MOVE.B  #2,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
+    TRAP    #15 ; excute trap
+    CMPI    #0,D1 ; check if there is char to process D1: length of string
+    BEQ     ERROR   ; If user didn't type anything, prompt error and restart the program.
+    CMPI    #8,D1 ; if there is more than 8 digits of hex. It is out of bound long address
+    BGT     ERROR 
+    JSR     ATOI
+    BTST    #0,D1 ; check even or odd address
     BNE     ERROR
-    MOVE.L  D1,START_ADDRESS ; save start address to variable start_address
+    MOVE.L  D2,START_ADDRESS ; save start address to variable start_address
     RTS
     
 END_ADDR:
     LEA     INPUT_END,A1 ; load message on A1
     MOVE.B  #14,D0 ; read char at A1 until null
     TRAP    #15 ; excute command code at D0
-    MOVE.B  #4,D0 ; read input num
-    TRAP    #15 
-    CMP     #0,D1 ; is ascii or negative int
+    MOVE.B  #2,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
+    TRAP    #15 ; excute trap
+    CMP     #0,D1 ; is ascii or negative hex
     BLE     ERROR ; negative int 
     BTST    #0,D1 ; even or odd
     BNE     ERROR
@@ -63,7 +66,23 @@ REPEAT_OR_FINISH:
     JMP     END ; end program
 
 ; TODO: convert int to HEX . Or user will input hex value? In second case, we need to develop a converter that does char to hex
-ASCII_TO_HEX:
+ATOI:
+    CMP     #0,D1 ; check if there is char to process D1: length of string
+    
+    MOVE.B  (A1)+,D0 ; load one char to D0 to process
+    SUB     #1,D1 ; decrement length of char D1: lengh of string
+    CMPI    #$46,D0 ; Check if the hex value of char is more than F ($46)
+    BGT     ERROR ; if is bigger than $46 prompt error
+    CMPI    #$41,D0 ; Check if the hex value of char is more or equal to A ($41)
+    BGE     CONVERT_CHAR_TO_HEX ; Jump to convert A-F to Hex
+    CMPI    #$39,D0 ; check if the hex value of char is less than 9 ($39)
+    BGT     ERROR ; out of bound for char value 1-9
+    CMPI    #$30,D0 ; check if the hex value of char is more than 0 ($30)
+    
+    
+CONVERT_CHAR_TO_HEX:
+    SUBI    #$37,D0 ; subtract hex 37 to convert A-F to hex
+    BRA     ATOI
 
 
 ERROR:
@@ -83,6 +102,7 @@ ERROR_INPUT   DC.B    'Please check your input!',CR,LF,0
 RESULT        DC.B    'Completed: ',CR,LF,0 
 
     END    START        ; last line of source
+
 
 
 *~Font name~Courier New~

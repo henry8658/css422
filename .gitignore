@@ -1,0 +1,5 @@
+# Ignore List File
+*.L68
+
+# Ignore S File
+*.S68
