@@ -4,7 +4,7 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %0011011111000001
+example     EQU     %0000000001000000
 bufsize     EQU     64 ; 64 characters can be stored in buffer
 
     ORG    $1000
@@ -14,11 +14,55 @@ START:                  ; first instruction of program
 EA_CALCULATE_SRC:
 
 
+EA_IMMEDIATE:
+    MOVE.W  #example,D1
+    JSR EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
+    ; generate immediate data
+    MOVE.B  #'#',(A2)+
+    MOVE.B  #'$',(A2)+
+    ;JSR     ITOA
+    ; generate dest EA address
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    JSR     EA_SRC_AS_DST
+    JMP     FINISH_EA
+    
+INSERT_SIZE_B_TO_BUFFER:
+    MOVE.B  #'.',(A2)+
+    MOVE.B  #'B',(A2)+
+    MOVE.B  #' ',(A2)+
+    RTS
+    
+INSERT_SIZE_W_TO_BUFFER:
+    MOVE.B  #'.',(A2)+
+    MOVE.B  #'W',(A2)+
+    MOVE.B  #' ',(A2)+
+    RTS
+
+INSERT_SIZE_L_TO_BUFFER:
+    MOVE.B  #'.',(A2)+
+    MOVE.B  #'L',(A2)+
+    MOVE.B  #' ',(A2)+
+    RTS
+    
+EA_SIZE_EXTRACT: ; extracting size for immediate data
+    ANDI.W  #$00C0,D1 ; extracting size part
+    ROR.W   #6,D1 ; rotating D1 to calculate Size
+    CMP.B   #%00,D1
+    BEQ     INSERT_SIZE_B_TO_BUFFER
+    CMP.B   #%01,D1
+    BEQ     INSERT_SIZE_W_TO_BUFFER
+    CMP.B   #%10,D1
+    BEQ     INSERT_SIZE_L_TO_BUFFER
+    BRA     FINISH_EA  ; Throw Error here if size is 11 which is incorrect for this case
+
+EA_SRC_AS_DST:
 
 EA_CALCULATE_DST:
     MOVE.L  #example,D0
-   ANDI.L  #%0000000111000000, D0 ; Extracting Mode for Destination
-    LSR.L   #6,D0
+
+    ANDI.W  #%0000000111000000, D0 ; Extracting Mode for Destination
+    LSR.W   #6,D0
     MULU    #6,D0
     LEA     ADDRESS_MODE_TABLE, A0
     JMP     0(A0, D0)
@@ -32,6 +76,9 @@ ADDRESS_MODE_TABLE:
     JMP     MODE_101 ; Not Supported
     JMP     MODE_110 ; Not Supported
     JMP     MODE_111 ; Absolute Word/Long Address or Immediate Data (mode 7)
+    
+EA_IMEDIATE_ONLY:
+    
     
 MODE_000:
     ; If there is an error, while calculating EA, then branch to Error handling and clear buffer and other variables.
@@ -80,6 +127,7 @@ FINISH_EA:
 buffer  DS.B    bufsize ; buffer 
 
     END    START        ; last line of source
+
 
 *~Font name~Courier New~
 *~Font size~11~
