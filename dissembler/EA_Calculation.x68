@@ -4,20 +4,32 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %0000000001000000
+example     EQU     %0011000000000000
 bufsize     EQU     64 ; 64 characters can be stored in buffer
     ORG    $1000
 START:                  ; first instruction of program
     
 * Put program code here
+; For EA calculation 
+; Follwing Register was used
+
+; D0: Current process insturction 
+; D1: Address Mode / EA Type
+; D2: Data Size
+; D3: Used for Reg Num
+; D5: Used for checking special condition
+; D6: Used for value to give ITOA
 
 EA_START:
+    LEA     buffer,A2
+    MOVE.W  #example,D0 ; save instruction in D0
+    MOVE.W  #2,D1 ; Copy D0 to D1 for processing EA Type
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
 
 EA_TYPE_TABLE:
-    JMP     EA_IMMEDIATE
+    JMP     EA_IMMEDIATE 
     JMP     EA_MOVE
     JMP     EA_MOVEA
 ;    JMP     EA_LEA
@@ -25,35 +37,65 @@ EA_TYPE_TABLE:
 ;    JMP     EA_EXT
 ;    JMP     EA_MOVEM
 ;    JMP     EA_TRAP
-;    JMP     EA_QUICK
+;    JMP     EA_QUICK ; ADDQ, SUBQ
 ;    JMP     EA_BRANCH
 
 EA_MOVE:
-    MOVE.W  #example,D1  
     JSR     EA_MOVE_SIZE
     JSR     EA_CALCULATE_SRC
+    MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
     JSR     EA_CALCULATE_DST
     JMP     FINISH_EA
 
 EA_MOVE_SIZE:
-    ANDI.W  #$00C0,D1 ; extracting size part
-    ROR.W   #6,D1 ; rotating D1 to calculate Size
-    CMP.B   #%00,D1
+    MOVE.W  D0,D2 ; move instruction to read size D2: size
+    ANDI.W  #$3000,D2 ; extracting size part
+    MOVE.W  #12,D5 ; shifting 15 times save at D5
+    LSR.W   D5,D2
+    CMP.B   #%01,D2
     BEQ     INSERT_SIZE_B_TO_BUFFER
-    CMP.B   #%01,D1
+    CMP.B   #%11,D2
     BEQ     INSERT_SIZE_W_TO_BUFFER
-    CMP.B   #%10,D1
+    CMP.B   #%10,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
     
 EA_MOVEA:
-
-
+    JSR     EA_MOVEA_SIZE
+    JSR     EA_CALCULATE_SRC
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'A',(A2)+
+    MOVE.W  D0,D3 ; reg num for dst
+    ANDI.W  #%0000111000000000,D3 ;Extracting Dest reg num
+    LSR.W   #8,D3 ; dst reg num
+    MOVE.B  D3,D6 ; give reg num to ATOI to process
+    MOVE.B  #00,D2 ; tell ITOA reg num size 
+    ; ITOA
+    JMP     FINISH_EA
+    
 EA_MOVEA_SIZE:
-
+    MOVE.W  D0,D2 ; move instruction to read size D2: size
+    ANDI.W  #$3000,D2 ; extracting size part
+    MOVE.W  #12,D5 ; shifting 15 times save at D5
+    LSR.W   D5,D2
+    CMP.B   #%11,D2
+    BEQ     INSERT_SIZE_W_TO_BUFFER
+    CMP.B   #%10,D2
+    BEQ     INSERT_SIZE_L_TO_BUFFER
+    BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
+    
+EA_QUICK:
+    MOVE.W  D0,D2
+    ANDI.W  #%0000000011000000,D2 ; extracting size for quick instruction
+    LSR.W   #6,D2
+    JSR     EA_SIZE_EXTRACT
+    
 EA_IMMEDIATE:
-    MOVE.W  #example,D1
+    MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
+    ANDI.W  #$00C0,D2 ; extracting size part
+    ROR.W   #6,D2 ; rotating D1 to calculate Size
     JSR EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
     ; generate immediate data
     MOVE.B  #'#',(A2)+
@@ -84,13 +126,11 @@ INSERT_SIZE_L_TO_BUFFER:
     RTS
     
 EA_SIZE_EXTRACT: ; extracting size for immediate data
-    ANDI.W  #$00C0,D1 ; extracting size part
-    ROR.W   #6,D1 ; rotating D1 to calculate Size
-    CMP.B   #%00,D1
+    CMP.B   #%00,D2
     BEQ     INSERT_SIZE_B_TO_BUFFER
-    CMP.B   #%01,D1
+    CMP.B   #%01,D2
     BEQ     INSERT_SIZE_W_TO_BUFFER
-    CMP.B   #%10,D1
+    CMP.B   #%10,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
 
@@ -111,16 +151,29 @@ EA_SRC_AS_DST:
     LEA     ADDRESS_MODE_TABLE, A0
     JMP     0(A0,D0)
 
+; Calculate source EA for general case
 EA_CALCULATE_SRC:
-
-EA_CALCULATE_DST:
-    MOVE.L  #example,D0
-
-    ANDI.W  #%0000000111000000, D0 ; Extracting Mode for Destination
-    LSR.W   #6,D0
-    MULU    #6,D0
+    MOVE.W  D0,D1 ; copy instruction to D1 to process src mode
+    MOVE.W  D0,D3 ; copy insturction to D3 to process reg num
+    ANDI.W  #%0000000000111000, D1 ; Extracting Mode for Source
+    ANDI.W  #%0000000000000111, D3 ; Extracting Src Num
+    LSR.W   #3,D1 ; normalize src mode num
+    MULU    #6,D1
     LEA     ADDRESS_MODE_TABLE, A0
-    JMP     0(A0, D0)
+    JMP     0(A0, D1)
+
+; Calculate dest EA for general case
+EA_CALCULATE_DST:
+    MOVE.W  D0,D1 ; copy instruction to D1 to process dst mode
+    MOVE.W  D0,D3 ; copy insturction to D3 to process reg num
+    ANDI.W  #%0000111000000000, D3 ; Extracting Reg num for Destination
+    ANDI.W  #%0000000111000000, D1 ; Extracting Mode for Destination
+    MOVE.B  #9,D5
+    LSR.W   D5,D3 ; normalize reg num
+    LSR.W   #6,D1 ; normalize mode num
+    MULU    #6,D1
+    LEA     ADDRESS_MODE_TABLE, A0
+    JMP     0(A0, D1)
   
 ;------------------------ADDRESS MODE TABLE----------------------------------------------
   
@@ -140,20 +193,21 @@ MODE_000:
     ; For the error case, consider what is next data to read.
     ; Do I have to check validity of Register Number?
     MOVE.B  #'D',(A2)+
-    MOVE.B  #00,D4 ; Tell ITOA to process Byte size data
+    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
     ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
     RTS
     
 MODE_001:
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D4 ; Tell ITOA to process Byte size data
+    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
     ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
     RTS ; I have to jump back on upper subroutin where this subrotuine gets called
 
-MODE_010:    
+MODE_010:
+    
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D4 ; Tell ITOA to process Byte size data
+    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
     ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
     MOVE.B  #')',(A2)+
     RTS
@@ -161,7 +215,7 @@ MODE_010:
 MODE_011:
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D4 ; Tell ITOA to process Byte size data
+    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
     ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
     MOVE.B  #')',(A2)+
     MOVE.B  #'+',(A2)+
@@ -171,7 +225,7 @@ MODE_100:
     MOVE.B  #'-',(A2)+
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D4 ; Tell ITOA to process Byte size data
+    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
     ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
     MOVE.B  #')',(A2)+
     RTS
@@ -193,11 +247,11 @@ MODE_111:
 ;----FILTER MODE 111----------------------------------------------------
 
 FILTER_SUB_MODE_111:
-       CMP.B  #0,D2 ; Absolute Word Address
+    CMP.B  #0,D3 ; Absolute Word Address
     BEQ    REG_000
-    CMP.B  #1,D2 ; Absolute Long Address
+    CMP.B  #1,D3 ; Absolute Long Address
     BEQ    REG_001
-    CMP.B  #3,D2 ; Immediate Data
+    CMP.B  #3,D3 ; Immediate Data
     BEQ    REG_100
     BRA    ERROR ; If there is no match reg num
 
@@ -224,8 +278,9 @@ ERROR:
     
 FINISH_EA:
     ; testing address mode table jump
-    MOVE.B  #15,D0
-    MOVE.B  #10,D2
+    MOVE.B  #0,(A2)+
+    LEA     buffer,A1
+    MOVE.B  #13,D0
     TRAP    #15
     
 END:
@@ -234,6 +289,9 @@ END:
 buffer  DS.B    bufsize ; buffer 
 
     END    START        ; last line of source
+
+
+
 
 
 
