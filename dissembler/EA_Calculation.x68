@@ -4,7 +4,7 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %0011000000000000
+example     EQU     %010011100010000
 bufsize     EQU     64 ; 64 characters can be stored in buffer
     ORG    $1000
 START:                  ; first instruction of program
@@ -23,7 +23,7 @@ START:                  ; first instruction of program
 EA_START:
     LEA     buffer,A2
     MOVE.W  #example,D0 ; save instruction in D0
-    MOVE.W  #2,D1 ; Copy D0 to D1 for processing EA Type
+    MOVE.W  #3,D1 ; Copy D0 to D1 for processing EA Type
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
@@ -32,7 +32,7 @@ EA_TYPE_TABLE:
     JMP     EA_IMMEDIATE 
     JMP     EA_MOVE
     JMP     EA_MOVEA
-;    JMP     EA_LEA
+    JMP     EA_LEA
 ;    JMP     EA_DST_ONLY
 ;    JMP     EA_EXT
 ;    JMP     EA_MOVEM
@@ -86,6 +86,43 @@ EA_MOVEA_SIZE:
     BEQ     INSERT_SIZE_L_TO_BUFFER
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
     
+EA_LEA:
+    MOVE.W  D0, D1                  ; Move instruction to D1 for mode
+    ANDI.W  #%0000000000111000,D1   ; get mode
+    LSR.W   #$3, D1
+    
+    MOVE.W  D0, D3                  ; Move instruction to D3 for reg
+    ANDI.W  #%0000000000000111,D3   ; get reg
+    
+    CMP.B   #7, D1                  ; if src mode == 010 || 111
+    BEQ     LEA_SUCCESS         
+                                    ;   LEA_SUCCESS
+    CMP.B   #2, D1
+    BEQ     LEA_SUCCESS         
+                                    ; else
+    BRA     ERROR                   ;   ERROR
+        
+LEA_SUCCESS:
+    MOVE.W  D0, D5                  ; CHECKING MODE 111'S REG EDGE CASE
+    ANDI.W  #$000F, D5          
+    CMP.B   #$A, D5                 ; IF REG is not 000 || 001
+    BGE     ERROR                   ;  ERROR
+                                    ; ELSE
+                                
+    JSR     EA_SRC_AS_DST           ;  process
+    
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    
+    MOVE.W  D0, D3                  ; Move instruction to D3 for reg
+    ANDI.W  #%0000111000000000,D3   ; get reg
+    MOVE.B  #$9, D5                 ; D5 Shift Counter = 9
+    LSR.W   D5, D3
+    
+    JSR     MODE_001            
+
+    JMP     FINISH_EA
+    
 EA_QUICK:
     MOVE.W  D0,D2
     ANDI.W  #%0000000011000000,D2 ; extracting size for quick instruction
@@ -94,7 +131,7 @@ EA_QUICK:
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     MOVE.W  D0,D3 ; calculate immediate data
-    ANDI.W  #%0000111000000000 ; filter data
+    ANDI.W  #%0000111000000000,D3 ; filter data
     MOVE.B  #9,D5 ; save 9 to D5 to filter the data in 9th position 
     LSR.W   D5,D3 ; Data
     CMP     #0,D3 ; check if D3 is 0, then insert 8 
@@ -162,7 +199,7 @@ EA_SRC_AS_DST:
     BEQ     FINISH_EA ; error -> Immediate data is not valid
     ANDI.W  #%0000000000111000, D1 ; Extracting Mode for Dest
     ANDI.W  #%0000000000000111, D2 ; Extracting Reg for Dest
-    LSR.W   #6,D1 ; 
+    LSR.W   #3,D1 ; 
     CMP.B   #1,D1 ; filter invalid An address mode for op code 0000
     BEQ     FINISH_EA ; Error Throw error for invalid address mode
     LSR.W   #6,D2 ; D2: Reg num
@@ -308,6 +345,7 @@ END:
 buffer  DS.B    bufsize ; buffer 
 
     END    START        ; last line of source
+
 
 
 
