@@ -91,6 +91,25 @@ EA_QUICK:
     ANDI.W  #%0000000011000000,D2 ; extracting size for quick instruction
     LSR.W   #6,D2
     JSR     EA_SIZE_EXTRACT
+    MOVE.B  #'#',(A2)+
+    MOVE.B  #'$',(A2)+
+    MOVE.W  D0,D3 ; calculate immediate data
+    ANDI.W  #%0000111000000000 ; filter data
+    MOVE.B  #9,D5 ; save 9 to D5 to filter the data in 9th position 
+    LSR.W   D5,D3 ; Data
+    CMP     #0,D3 ; check if D3 is 0, then insert 8 
+    BEQ     EA_QUICK_DATA ; check if D3 is 0, then insert 8
+    MOVE.W  D0,D1 ; dst mode
+    LSR.W   #2,D1
+    CMP.B   #$F,D1 ; unsupported EA immediate addr mode
+    BEQ     ERROR
+    JSR     INSERT_REG_NUM ; insert immediate 1-8
+    JSR     EA_CALCULATE_SRC
+    JMP     FINISH_EA
+    
+EA_QUICK_DATA:
+    
+
     
 EA_IMMEDIATE:
     MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
@@ -135,21 +154,21 @@ EA_SIZE_EXTRACT: ; extracting size for immediate data
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
 
 EA_SRC_AS_DST:
-    MOVE.L  #example,D0 ; D0: save mode num
-    MOVE.L  #example,D2 ; D2: save reg num 
-    MOVE.L  #example,D6 ; D6: checking invalid address mode for mode 111
-    LSR.L   #2,D6 ; extrating mode and reg num for checking invalid mode 111
-    CMP.B   #$F,D6 ; not supported in this  Immedate data address mode 
+    MOVE.W  D0,D1 ; D0: save mode num
+    MOVE.W  D0,D2 ; D2: save reg num 
+    MOVE.W  D0,D5 ; D5: checking invalid address mode for mode 111
+    LSR.L   #2,D5 ; extrating mode and reg num for checking invalid mode 111
+    CMP.B   #$F,D5 ; not supported in this  Immedate data address mode 
     BEQ     FINISH_EA ; error -> Immediate data is not valid
-    ANDI.W  #%0000000000111000, D0 ; Extracting Mode for Dest
+    ANDI.W  #%0000000000111000, D1 ; Extracting Mode for Dest
     ANDI.W  #%0000000000000111, D2 ; Extracting Reg for Dest
-    LSR.W   #6,D0 ; 
-    CMP.B   #1,D0 ; filter invalid An address mode for op code 0000
+    LSR.W   #6,D1 ; 
+    CMP.B   #1,D1 ; filter invalid An address mode for op code 0000
     BEQ     FINISH_EA ; Error Throw error for invalid address mode
     LSR.W   #6,D2 ; D2: Reg num
-    MULU    #6,D0 ; For address mode jump table 
+    MULU    #6,D1 ; For address mode jump table 
     LEA     ADDRESS_MODE_TABLE, A0
-    JMP     0(A0,D0)
+    JMP     0(A0,D1)
 
 ; Calculate source EA for general case
 EA_CALCULATE_SRC:
@@ -175,6 +194,11 @@ EA_CALCULATE_DST:
     LEA     ADDRESS_MODE_TABLE, A0
     JMP     0(A0, D1)
   
+INSERT_REG_NUM:
+    ADD     #$30, D3 ; add hex 30 to convert D3 to ascii char
+    MOVE.B  D3,(A2)+
+    RTS
+  
 ;------------------------ADDRESS MODE TABLE----------------------------------------------
   
 ADDRESS_MODE_TABLE:
@@ -193,30 +217,26 @@ MODE_000:
     ; For the error case, consider what is next data to read.
     ; Do I have to check validity of Register Number?
     MOVE.B  #'D',(A2)+
-    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
-    ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
+    JSR     INSERT_REG_NUM ; add register number
     RTS
     
 MODE_001:
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
-    ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
+    JSR     INSERT_REG_NUM ; add register number
     RTS ; I have to jump back on upper subroutin where this subrotuine gets called
 
 MODE_010:
     
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
-    ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
+    JSR     INSERT_REG_NUM ; add register number
     MOVE.B  #')',(A2)+
     RTS
     
 MODE_011:
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
-    ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
+    JSR     INSERT_REG_NUM ; add register number
     MOVE.B  #')',(A2)+
     MOVE.B  #'+',(A2)+
     RTS
@@ -225,8 +245,7 @@ MODE_100:
     MOVE.B  #'-',(A2)+
     MOVE.B  #'(',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.B  #00,D2 ; Tell ITOA to process Byte size data
-    ; ITOA ; ITOA will insert Reg num , ITOA will insert D2 value in Buffer
+    JSR     INSERT_REG_NUM ; add register number
     MOVE.B  #')',(A2)+
     RTS
     
