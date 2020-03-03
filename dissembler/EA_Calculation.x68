@@ -4,7 +4,7 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %010011100010000
+example     EQU     %0101000001000111
 bufsize     EQU     64 ; 64 characters can be stored in buffer
     ORG    $1000
 START:                  ; first instruction of program
@@ -26,7 +26,7 @@ START:                  ; first instruction of program
 EA_START:
     LEA     buffer,A2
     MOVE.W  #example,D0 ; save instruction in D0
-    MOVE.W  #3,D1 ; Copy D0 to D1 for processing EA Type
+    MOVE.W  #4,D1 ; Copy D0 to D1 for processing EA Type
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
@@ -40,7 +40,7 @@ EA_TYPE_TABLE:
 ;    JMP     EA_EXT
 ;    JMP     EA_MOVEM
 ;    JMP     EA_TRAP
-;    JMP     EA_QUICK ; ADDQ, SUBQ
+    JMP     EA_QUICK ; ADDQ, SUBQ
     JMP     EA_BRANCH
 
 EA_MOVE:
@@ -133,23 +133,30 @@ EA_QUICK:
     JSR     EA_SIZE_EXTRACT
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
+    MOVE.W  D0,D1 ; dst mode
+    LSR.W   #2,D1
+    CMP.B   #$F,D1 ; unsupported EA immediate addr mode
+    BEQ     ERROR
     MOVE.W  D0,D3 ; calculate immediate data
     ANDI.W  #%0000111000000000,D3 ; filter data
     MOVE.B  #9,D5 ; save 9 to D5 to filter the data in 9th position 
     LSR.W   D5,D3 ; Data
     CMP     #0,D3 ; check if D3 is 0, then insert 8 
     BEQ     EA_QUICK_DATA ; check if D3 is 0, then insert 8
-    MOVE.W  D0,D1 ; dst mode
-    LSR.W   #2,D1
-    CMP.B   #$F,D1 ; unsupported EA immediate addr mode
-    BEQ     ERROR
     JSR     INSERT_REG_NUM ; insert immediate 1-8
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #',',(A2)+
     JSR     EA_CALCULATE_SRC
     JMP     FINISH_EA
     
 EA_QUICK_DATA:
+    MOVE.B  #8,D3
+    JSR     INSERT_REG_NUM ; insert 8
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #',',(A2)+
+    JSR     EA_CALCULATE_SRC
+    JMP     FINISH_EA
     
-
 EA_BRANCH:
     MOVE.W  D0, D2      ;   NEED TO CHECK [ANDI.W #$00FF]
     ANDI.W  #$00FF, D2  ;   If 00 || FF 
@@ -160,7 +167,7 @@ EA_BRANCH:
 
     ;   else Byte size   
     ADDI.W  #$2, D2
-    ADDI.L  D7, D2      ;
+    ADD.L  D7, D2      ;
     MOVE.L  D2, D6      ;   D6 = PC + (DISPLACEMENT + 2)
     ;JSR     ITOA
       
@@ -170,7 +177,7 @@ EA_BRANCH:
 Bcc_Extend:
     JSR     EA_Bcc_EXTENDED
     ADDI.L  #$2, D6     
-    ADDI.L  D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
+    ADD.L  D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
     
     ;JSR    ITOA 
    
@@ -411,6 +418,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 *~Font name~Courier New~
 *~Font size~11~
 *~Tab type~1~
