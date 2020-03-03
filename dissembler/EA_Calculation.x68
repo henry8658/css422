@@ -271,13 +271,11 @@ EA_EXTENDED:
 EA_WORD_DATA:
     MOVE.B   #4,D4 ; pc displacement = 4 
     MOVE.W   2(A3),D6 ; move A3 word and read word data
-    ; ITOA
     RTS ; return to EA Calculate
     
 EA_LONG_DATA:
     MOVE.B   #6,D4 ; pc displacement = 6
     MOVE.L   2(A3),D6 ; move A3 word and read long data
-    ; ITOA 
     RTS ; return to EA Calculate
   
 ;------------------------ADDRESS MODE TABLE----------------------------------------------
@@ -357,17 +355,20 @@ FILTER_SUB_MODE_111:
 
 REG_000:
     MOVE.B  #'$',(A2)+
+    JSR     EA_EXTENDED
     ; ITOA insert word address
     RTS
     
 REG_001:
     MOVE.B  #'$',(A2)+
+    JSR     EA_EXTENDED
     ; ITOA insert long address
     RTS
     
 REG_100:
     MOVE.B  #'$',(A2)+
     MOVE.B  #'#',(A2)+
+    JSR     EA_EXTENDED
     ; ITOA insert immediate data
     RTS
     
@@ -389,6 +390,7 @@ END:
 buffer  DS.B    bufsize ; buffer 
 
     END    START        ; last line of source
+
 
 
 
