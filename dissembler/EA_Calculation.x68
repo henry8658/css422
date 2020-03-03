@@ -17,6 +17,7 @@ START:                  ; first instruction of program
 ; D1: Address Mode / EA Type
 ; D2: Data Size
 ; D3: Used for Reg Num
+; D4: PC Counter displacement for next insturction read
 ; D5: Used for checking special condition
 ; D6: Used for value to give ITOA
 ; D7: PC COUNTER (DO NOT CHANGE)
@@ -177,11 +178,12 @@ EA_IMMEDIATE:
     MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
     ANDI.W  #$00C0,D2 ; extracting size part
     ROR.W   #6,D2 ; rotating D1 to calculate Size
-    JSR EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
+    JSR     EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
     ; generate immediate data
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
-    ;JSR     ITOA
+    JSR     EA_EXTENDED ; to process immediate data
+    ; JSR     ITOA
     ; generate dest EA address
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -260,6 +262,23 @@ INSERT_REG_NUM:
     ADD     #$30, D3 ; add hex 30 to convert D3 to ascii char
     MOVE.B  D3,(A2)+
     RTS
+    
+EA_EXTENDED:
+    CMP.B     #%10,D2 ; check if it's word or long size immediate data
+    BEQ       EA_LONG_DATA
+    BRA       EA_WORD_DATA
+    
+EA_WORD_DATA:
+    MOVE.B   #4,D4 ; pc displacement = 4 
+    MOVE.W   2(A3),D6 ; move A3 word and read word data
+    ; ITOA
+    RTS ; return to EA Calculate
+    
+EA_LONG_DATA:
+    MOVE.B   #6,D4 ; pc displacement = 6
+    MOVE.L   2(A3),D6 ; move A3 word and read long data
+    ; ITOA 
+    RTS ; return to EA Calculate
   
 ;------------------------ADDRESS MODE TABLE----------------------------------------------
   
@@ -370,6 +389,7 @@ END:
 buffer  DS.B    bufsize ; buffer 
 
     END    START        ; last line of source
+
 
 
 
