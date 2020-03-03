@@ -4,8 +4,13 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %0101000001000111
+example     EQU     %0011101001111000
 bufsize     EQU     64 ; 64 characters can be stored in buffer
+right4      EQU 4
+right8      EQU 8
+right16     EQU 16
+right24     EQU 24
+
     ORG    $1000
 START:                  ; first instruction of program
     
@@ -23,25 +28,27 @@ START:                  ; first instruction of program
 ; D7: PC COUNTER (DO NOT CHANGE)
 ; A3: Pointing Current Address of the Instruction 
 
+; we might have to combine logic in ATOI
+
 EA_START:
     LEA     buffer,A2
     MOVE.W  #example,D0 ; save instruction in D0
-    MOVE.W  #4,D1 ; Copy D0 to D1 for processing EA Type
+    MOVE.W  #2,D1 ; Copy D0 to D1 for processing EA Type
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
 
 EA_TYPE_TABLE:
-    JMP     EA_IMMEDIATE 
-    JMP     EA_MOVE
-    JMP     EA_MOVEA
-    JMP     EA_LEA
-;    JMP     EA_DST_ONLY
-;    JMP     EA_EXT
-;    JMP     EA_MOVEM
-;    JMP     EA_TRAP
-    JMP     EA_QUICK ; ADDQ, SUBQ
-    JMP     EA_BRANCH
+    JMP     EA_IMMEDIATE ; EA_TYPE 0
+    JMP     EA_MOVE ;1
+    JMP     EA_MOVEA ;2
+    JMP     EA_LEA ;3
+;    JMP     EA_DST_ONLY ;4
+;    JMP     EA_EXT ;5
+;    JMP     EA_MOVEM ;6
+;    JMP     EA_TRAP ;7
+    JMP     EA_QUICK ; ADDQ, SUBQ ;8
+    JMP     EA_BRANCH ;9
 
 EA_MOVE:
     JSR     EA_MOVE_SIZE
@@ -72,10 +79,9 @@ EA_MOVEA:
     MOVE.B  #'A',(A2)+
     MOVE.W  D0,D3 ; reg num for dst
     ANDI.W  #%0000111000000000,D3 ;Extracting Dest reg num
-    LSR.W   #8,D3 ; dst reg num
-    MOVE.B  D3,D6 ; give reg num to ATOI to process
-    MOVE.B  #00,D2 ; tell ITOA reg num size 
-    ; ITOA
+    MOVE.B  #9,D5 
+    LSR.W   D5,D3 ; dst reg num
+    JSR     INSERT_REG_NUM
     JMP     FINISH_EA
     
 EA_MOVEA_SIZE:
@@ -146,7 +152,7 @@ EA_QUICK:
     JSR     INSERT_REG_NUM ; insert immediate 1-8
     MOVE.B  #' ',(A2)+
     MOVE.B  #',',(A2)+
-    JSR     EA_CALCULATE_SRC
+    JSR     EA_CALCULATE_SRC ;
     JMP     FINISH_EA
     
 EA_QUICK_DATA:
@@ -389,6 +395,110 @@ REG_100:
     
 ;----------------------------------------------------------------------------
     
+;-------------------------------ITOA-----------------------------------------
+
+ITOA:
+	MOVEM.L	    D0-D1, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
+	
+	CMP.B	    #%00, D2		    ; BYTE
+	BEQ	        ITOA_BYTE		
+	CMP.B	    #%01, D2		    ; WORD
+	BEQ	        ITOA_WORD	
+	CMP.B	    #%10, D2		    ; LONG
+	BEQ	        ITOA_LONG
+	JMP	        ITOA_LONGADDR		; LONG ADDRESS
+
+ITOA_MOVE:
+	MOVEM.L	    D0-D1, -(SP)		; push EA_**** (EA_TYPE)
+	
+	CMP.B	    #%01, D2		    ; BYTE
+	BEQ	        ITOA_BYTE		
+	CMP.B	    #%11, D2		    ; WORD
+	BEQ	        ITOA_WORD	
+	CMP.B	    #%10, D2		    ; LONG
+	BEQ	        ITOA_LONG
+	JMP	        ITOA_LONGADDR		; LONG ADDRESS
+
+ITOA_BYTE:
+	MOVE.W	    (A5)+, D7		    ; D7 = #A5++;
+	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7)
+	JMP	        ITOA_DONE
+
+ITOA_WORD:
+	MOVE.W	    (A5), D7		    ; D7 = *A5;
+	MOVE.B      #right8, D1		
+	LSR.W	    D1, D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_upper (D7)
+	MOVE.W	    (A5)+, D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7)
+	JMP	        ITOA_DONE
+
+ITOA_LONG:
+	MOVE.W	    (A5), D7		    ; D7 = *A5;
+	MOVE.B	    #right8, D1
+	LSR.W	    D1,D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_upper(D7)
+	MOVE.W	    (A5)+, D7
+	JSR 	    ITOA_BYTE_CONVERT	; itoa_lower(D7)
+	
+	MOVE.W      (A5), D7            ; D7 = *A5;
+	MOVE.B      #right8, D1
+	LSR.W       D1,D7
+	JSR         ITOA_BYTE_CONVERT   ; itoa_upper (D7)
+	MOVE.W      (A5)+, D7
+	JSR         ITOA_BYTE_CONVERT   ; itoa_lower (D7)
+	JMP         ITOA_DONE
+
+ITOA_LONGADDR:
+	MOVE.W	    A5, D7			    ; D7= A5;
+	MOVE.B	    #right24, D1
+	LSR.W 	    D1, D7
+	JSR	        ITOA_BYTE_CONVERT 	; itoa_upper (D7 >>24);
+	MOVE.W      A5, D7			    ; D7 = A5
+	MOVE.B	    #right16,  D1
+	LSR.W 	    D1, D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7 >> 16);
+	MOVE.W	    A5, D7			    ; D7 = A5
+	MOVE.B	    #right8, D1
+	LSR.W	    D1,D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_upper (D7 >> 8);
+	MOVE.W	    A5, D7
+	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7);
+	JMP	        ITOA_DONE
+
+ITOA_BYTE_CONVERT:
+	MOVE.W	    D7, D0
+	ANDI.W	    #$F0, D0	        ; D0 = D0 & 0xF0
+	MOVE.B	    #right4, D1
+	LSR.W	    D1,D0		        ; D0 = D0 >> 0;
+	JSR 	    ITOA_NIBBLE_CONVERT ; ITOA_CONVERT D0
+	
+	MOVE.W	    D7, D0
+	ANDI.W      #$0F, D0		    ; D0 = D7 & 0x0F
+	JSR	        ITOA_NIBBLE_CONVERT ; ITOA_CONVERT(D0)
+    RTS
+    
+ITOA_NIBBLE_CONVERT:
+	CMP.B	    #9, D0
+	BGT	        ITOA_CONVERT_A2F
+	ADD.B	    #$30, D0	        ; D0 += '0'
+	MOVE.B	    D0, (A2)+	        ; PRINT D0 IN HEX TO *A2
+	RTS
+	
+ITOA_CONVERT_A2F:
+	SUBI.B	    #10, D0
+	ADDI.B      #$41, D0
+	MOVE.B	    D0, (A2)+
+	RTS
+
+ITOA_DONE:
+	MOVEM.L	    (SP)+, D0-D1 	    ; POP D1 (EA_TYPE)
+	RTS
+
+;----------------------------------------------------------
+    
+    
+    
 ERROR:
     JMP     END
     
@@ -418,6 +528,8 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
+
 
 *~Font name~Courier New~
 *~Font size~11~
