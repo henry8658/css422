@@ -41,7 +41,7 @@ EA_TYPE_TABLE:
 ;    JMP     EA_MOVEM
 ;    JMP     EA_TRAP
 ;    JMP     EA_QUICK ; ADDQ, SUBQ
-;    JMP     EA_BRANCH
+    JMP     EA_BRANCH
 
 EA_MOVE:
     JSR     EA_MOVE_SIZE
@@ -154,25 +154,28 @@ EA_BRANCH:
     MOVE.W  D0, D2      ;   NEED TO CHECK [ANDI.W #$00FF]
     ANDI.W  #$00FF, D2  ;   If 00 || FF 
     CMP.B   #$FF, D2    ; 
-    BEQ     ERROR
+    BEQ     Bcc_Extend  ;       FF = Long
     CMP.B   #$00, D2    
-    BEQ     Bcc_Extend
+    BEQ     Bcc_Extend  ;       00 = W
 
     ;   else Byte size   
-    ; Problem
-    ; Bcc.s works if there is next valid instruction
-    ; PBL 1. how are we going to check if there is next valid instruction 
-    ; if yes, 60_ _ add last two to the (PC+2)  
-    ; if no, Error - out of range
-    
+    ADDI.W  #$2, D2
+    ADDI.L  D7, D2      ;
+    MOVE.L  D2, D6      ;   D6 = PC + (DISPLACEMENT + 2)
+    ;JSR     ITOA
+      
     JMP    FINISH_EA
     
+    
 Bcc_Extend:
-    ; retrieve next Word address
-    ; add it to (PC+2)
-    ; Bcc (#displacement)
+    JSR     EA_Bcc_EXTENDED
+    ADDI.L  #$2, D6     
+    ADDI.L  D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
+    
+    ;JSR    ITOA 
+   
     JMP     FINISH_EA
- 
+
         
 EA_IMMEDIATE:
     MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
@@ -265,6 +268,11 @@ INSERT_REG_NUM:
     
 EA_EXTENDED:
     CMP.B     #%10,D2 ; check if it's word or long size immediate data
+    BEQ       EA_LONG_DATA
+    BRA       EA_WORD_DATA
+    
+EA_Bcc_EXTENDED:
+    CMP.B     #$FF,D2 ; check if it's word or long size 
     BEQ       EA_LONG_DATA
     BRA       EA_WORD_DATA
     
@@ -399,6 +407,10 @@ buffer  DS.B    bufsize ; buffer
 
 
 
+*~Font name~Courier New~
+*~Font size~11~
+*~Tab type~1~
+*~Tab size~4~
 *~Font name~Courier New~
 *~Font size~11~
 *~Tab type~1~
