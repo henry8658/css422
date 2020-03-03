@@ -19,6 +19,8 @@ START:                  ; first instruction of program
 ; D3: Used for Reg Num
 ; D5: Used for checking special condition
 ; D6: Used for value to give ITOA
+; D7: PC COUNTER (DO NOT CHANGE)
+; A3: Pointing Current Address of the Instruction 
 
 EA_START:
     LEA     buffer,A2
@@ -147,7 +149,30 @@ EA_QUICK:
 EA_QUICK_DATA:
     
 
+EA_BRANCH:
+    MOVE.W  D0, D2      ;   NEED TO CHECK [ANDI.W #$00FF]
+    ANDI.W  #$00FF, D2  ;   If 00 || FF 
+    CMP.B   #$FF, D2    ; 
+    BEQ     ERROR
+    CMP.B   #$00, D2    
+    BEQ     Bcc_Extend
+
+    ;   else Byte size   
+    ; Problem
+    ; Bcc.s works if there is next valid instruction
+    ; PBL 1. how are we going to check if there is next valid instruction 
+    ; if yes, 60_ _ add last two to the (PC+2)  
+    ; if no, Error - out of range
     
+    JMP    FINISH_EA
+    
+Bcc_Extend:
+    ; retrieve next Word address
+    ; add it to (PC+2)
+    ; Bcc (#displacement)
+    JMP     FINISH_EA
+ 
+        
 EA_IMMEDIATE:
     MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
     ANDI.W  #$00C0,D2 ; extracting size part
