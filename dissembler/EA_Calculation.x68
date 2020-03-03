@@ -4,7 +4,7 @@
 * Date       :
 * Description: Calculating EA for given input
 *-----------------------------------------------------------
-example     EQU     %0011101001111000
+
 bufsize     EQU     64 ; 64 characters can be stored in buffer
 right4      EQU 4
 right8      EQU 8
@@ -18,22 +18,26 @@ START:                  ; first instruction of program
 ; For EA calculation 
 ; Follwing Register was used
 
-; D0: Current process insturction 
-; D1: Address Mode / EA Type
+; D0: EA Type (IT DOES NOT CHANGE IN EA)
+; D1: Address Mode / EA TYPE PROCESS
 ; D2: Data Size
 ; D3: Used for Reg Num
-; D4: PC Counter displacement for next insturction read
-; D5: Used for checking special condition
+; D4: PC Counter displacement for next insturction read (Don't modify it)
+; D5: Used for checking special condition ex) checking invalid address mode
 ; D6: Used for value to give ITOA
 ; D7: PC COUNTER (DO NOT CHANGE)
 ; A3: Pointing Current Address of the Instruction 
+; A5: buffer for ITOA
 
 ; we might have to combine logic in ATOI
 
 EA_START:
     LEA     buffer,A2
-    MOVE.W  #example,D0 ; save instruction in D0
-    MOVE.W  #2,D1 ; Copy D0 to D1 for processing EA Type
+    MOVEA   #$500,A3 ; testing example start address
+    MOVE.L  #$31FC1234,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.W  #$7890, 4(A3)
+    MOVE.B  #1,D1 ; D1 for processing EA Type
+    MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
@@ -52,6 +56,7 @@ EA_TYPE_TABLE:
 
 EA_MOVE:
     JSR     EA_MOVE_SIZE
+    ADDI    #2,D4 ; instruction word displacement
     JSR     EA_CALCULATE_SRC
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -59,7 +64,7 @@ EA_MOVE:
     JMP     FINISH_EA
 
 EA_MOVE_SIZE:
-    MOVE.W  D0,D2 ; move instruction to read size D2: size
+    MOVE.W  (A3),D2 ; move instruction to read size D2: size
     ANDI.W  #$3000,D2 ; extracting size part
     MOVE.W  #12,D5 ; shifting 15 times save at D5
     LSR.W   D5,D2
@@ -73,11 +78,12 @@ EA_MOVE_SIZE:
     
 EA_MOVEA:
     JSR     EA_MOVEA_SIZE
+    ADDI    #2,D4 ; instruction word displacement
     JSR     EA_CALCULATE_SRC
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
     MOVE.B  #'A',(A2)+
-    MOVE.W  D0,D3 ; reg num for dst
+    MOVE.W  (A3),D3 ; reg num for dst
     ANDI.W  #%0000111000000000,D3 ;Extracting Dest reg num
     MOVE.B  #9,D5 
     LSR.W   D5,D3 ; dst reg num
@@ -85,7 +91,7 @@ EA_MOVEA:
     JMP     FINISH_EA
     
 EA_MOVEA_SIZE:
-    MOVE.W  D0,D2 ; move instruction to read size D2: size
+    MOVE.W  (A3),D2 ; move instruction to read size D2: size
     ANDI.W  #$3000,D2 ; extracting size part
     MOVE.W  #12,D5 ; shifting 15 times save at D5
     LSR.W   D5,D2
@@ -96,11 +102,11 @@ EA_MOVEA_SIZE:
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
     
 EA_LEA:
-    MOVE.W  D0, D1                  ; Move instruction to D1 for mode
+    MOVE.W  (A3), D1                  ; Move instruction to D1 for mode
     ANDI.W  #%0000000000111000,D1   ; get mode
     LSR.W   #$3, D1
     
-    MOVE.W  D0, D3                  ; Move instruction to D3 for reg
+    MOVE.W  (A3), D3                  ; Move instruction to D3 for reg
     ANDI.W  #%0000000000000111,D3   ; get reg
     
     CMP.B   #7, D1                  ; if src mode == 010 || 111
@@ -112,18 +118,19 @@ EA_LEA:
     BRA     ERROR                   ;   ERROR
         
 LEA_SUCCESS:
-    MOVE.W  D0, D5                  ; CHECKING MODE 111'S REG EDGE CASE
+    MOVE.W  (A3), D5                  ; CHECKING MODE 111'S REG EDGE CASE
     ANDI.W  #$000F, D5          
     CMP.B   #$A, D5                 ; IF REG is not 000 || 001
     BGE     ERROR                   ;  ERROR
                                     ; ELSE
-                                
+                          
+    ADDI    #2,D4 ; instruction word displacement
     JSR     EA_SRC_AS_DST           ;  process
     
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
     
-    MOVE.W  D0, D3                  ; Move instruction to D3 for reg
+    MOVE.W  (A3), D3                  ; Move instruction to D3 for reg
     ANDI.W  #%0000111000000000,D3   ; get reg
     MOVE.B  #$9, D5                 ; D5 Shift Counter = 9
     LSR.W   D5, D3
@@ -133,17 +140,18 @@ LEA_SUCCESS:
     JMP     FINISH_EA
     
 EA_QUICK:
-    MOVE.W  D0,D2
+    MOVE.W  (A3),D2
     ANDI.W  #%0000000011000000,D2 ; extracting size for quick instruction
     LSR.W   #6,D2
+    ADDI    #2,D4 ; instruction word displacement
     JSR     EA_SIZE_EXTRACT
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
-    MOVE.W  D0,D1 ; dst mode
+    MOVE.W  (A3),D1 ; dst mode
     LSR.W   #2,D1
     CMP.B   #$F,D1 ; unsupported EA immediate addr mode
     BEQ     ERROR
-    MOVE.W  D0,D3 ; calculate immediate data
+    MOVE.W  (A3),D3 ; calculate immediate data
     ANDI.W  #%0000111000000000,D3 ; filter data
     MOVE.B  #9,D5 ; save 9 to D5 to filter the data in 9th position 
     LSR.W   D5,D3 ; Data
@@ -164,7 +172,7 @@ EA_QUICK_DATA:
     JMP     FINISH_EA
     
 EA_BRANCH:
-    MOVE.W  D0, D2      ;   NEED TO CHECK [ANDI.W #$00FF]
+    MOVE.W  (A3), D2      ;   NEED TO CHECK [ANDI.W #$00FF]
     ANDI.W  #$00FF, D2  ;   If 00 || FF 
     CMP.B   #$FF, D2    ; 
     BEQ     Bcc_Extend  ;       FF = Long
@@ -175,7 +183,7 @@ EA_BRANCH:
     ADDI.W  #$2, D2
     ADD.L  D7, D2      ;
     MOVE.L  D2, D6      ;   D6 = PC + (DISPLACEMENT + 2)
-    ;JSR     ITOA
+    JSR     START_ITOA
       
     JMP    FINISH_EA
     
@@ -185,21 +193,22 @@ Bcc_Extend:
     ADDI.L  #$2, D6     
     ADD.L  D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
     
-    ;JSR    ITOA 
+    JSR    START_ITOA
    
     JMP     FINISH_EA
 
         
 EA_IMMEDIATE:
-    MOVE.W  D0,D2 ; copy insturction to D2 for process Data size
+    MOVE.W  (A3),D2 ; copy insturction to D2 for process Data size
     ANDI.W  #$00C0,D2 ; extracting size part
     ROR.W   #6,D2 ; rotating D1 to calculate Size
+    ADDI    #2,D4 ; instruction word displacement
     JSR     EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
-    ; generate immediate data
+    ADDI    #2,D4 ; instruction word displacement    ; generate immediate data
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED ; to process immediate data
-    ; JSR     ITOA
+    JSR     ITOA
     ; generate dest EA address
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -234,26 +243,25 @@ EA_SIZE_EXTRACT: ; extracting size for immediate data
     BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
 
 EA_SRC_AS_DST:
-    MOVE.W  D0,D1 ; D0: save mode num
-    MOVE.W  D0,D2 ; D2: save reg num 
-    MOVE.W  D0,D5 ; D5: checking invalid address mode for mode 111
+    MOVE.W  (A3),D1 ; D1: save mode num
+    MOVE.W  (A3),D3 ; D2: save reg num 
+    MOVE.W  (A3),D5 ; D5: checking invalid address mode for mode 111
     LSR.L   #2,D5 ; extrating mode and reg num for checking invalid mode 111
     CMP.B   #$F,D5 ; not supported in this  Immedate data address mode 
     BEQ     FINISH_EA ; error -> Immediate data is not valid
     ANDI.W  #%0000000000111000, D1 ; Extracting Mode for Dest
-    ANDI.W  #%0000000000000111, D2 ; Extracting Reg for Dest
+    ANDI.W  #%0000000000000111, D3 ; Extracting Reg for Dest
     LSR.W   #3,D1 ; 
     CMP.B   #1,D1 ; filter invalid An address mode for op code 0000
-    BEQ     FINISH_EA ; Error Throw error for invalid address mode
-    LSR.W   #6,D2 ; D2: Reg num
+    BEQ     ERROR ; Error Throw error for invalid address mode
     MULU    #6,D1 ; For address mode jump table 
     LEA     ADDRESS_MODE_TABLE, A0
     JMP     0(A0,D1)
 
 ; Calculate source EA for general case
 EA_CALCULATE_SRC:
-    MOVE.W  D0,D1 ; copy instruction to D1 to process src mode
-    MOVE.W  D0,D3 ; copy insturction to D3 to process reg num
+    MOVE.W  (A3),D1 ; copy instruction to D1 to process src mode
+    MOVE.W  (A3),D3 ; copy insturction to D3 to process reg num
     ANDI.W  #%0000000000111000, D1 ; Extracting Mode for Source
     ANDI.W  #%0000000000000111, D3 ; Extracting Src Num
     LSR.W   #3,D1 ; normalize src mode num
@@ -263,8 +271,8 @@ EA_CALCULATE_SRC:
 
 ; Calculate dest EA for general case
 EA_CALCULATE_DST:
-    MOVE.W  D0,D1 ; copy instruction to D1 to process dst mode
-    MOVE.W  D0,D3 ; copy insturction to D3 to process reg num
+    MOVE.W  (A3),D1 ; copy instruction to D1 to process dst mode
+    MOVE.W  (A3),D3 ; copy insturction to D3 to process reg num
     ANDI.W  #%0000111000000000, D3 ; Extracting Reg num for Destination
     ANDI.W  #%0000000111000000, D1 ; Extracting Mode for Destination
     MOVE.B  #9,D5
@@ -290,13 +298,15 @@ EA_Bcc_EXTENDED:
     BRA       EA_WORD_DATA
     
 EA_WORD_DATA:
-    MOVE.B   #4,D4 ; pc displacement = 4 
-    MOVE.W   2(A3),D6 ; move A3 word and read word data
+    MOVE.W   (A3,D4),D6 ; move A3 word and read word data
+    ADDI      #2,D4 ; pc displacement = 2 
+    MOVE.W   D6, (A5) ; Insert word data
     RTS ; return to EA Calculate
     
 EA_LONG_DATA:
-    MOVE.B   #6,D4 ; pc displacement = 6
-    MOVE.L   2(A3),D6 ; move A3 word and read long data
+    MOVE.L   (A3,D4),D6 ; move A3 word and read long data
+    ADDI      #4,D4 ; pc displacement = 4
+    MOVE.L   D6, (A5) ; Insert long data
     RTS ; return to EA Calculate
   
 ;------------------------ADDRESS MODE TABLE----------------------------------------------
@@ -370,32 +380,45 @@ FILTER_SUB_MODE_111:
     BEQ    REG_000
     CMP.B  #1,D3 ; Absolute Long Address
     BEQ    REG_001
-    CMP.B  #3,D3 ; Immediate Data
+    CMP.B  #4,D3 ; Immediate Data
     BEQ    REG_100
     BRA    ERROR ; If there is no match reg num
 
 REG_000:
     MOVE.B  #'$',(A2)+
+    MOVE.B  #%01,D2 ; Process Word Address in ITOA
     JSR     EA_EXTENDED
-    ; ITOA insert word address
+    JSR     ITOA
     RTS
     
 REG_001:
     MOVE.B  #'$',(A2)+
+    MOVE.B  #%10,D2 ; Process Long Address in ITOA
     JSR     EA_EXTENDED
-    ; ITOA insert long address
+    JSR     ITOA
     RTS
     
 REG_100:
-    MOVE.B  #'$',(A2)+
     MOVE.B  #'#',(A2)+
+    MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED
-    ; ITOA insert immediate data
+    JSR     START_ITOA
     RTS
     
 ;----------------------------------------------------------------------------
     
 ;-------------------------------ITOA-----------------------------------------
+
+; There is error in ITOA. If Long Immediate data has to be write in buffer, it doesn't work.
+
+START_ITOA:
+    ;MOVE.L   D6,(A5) ; This one has to be LONG instead of WORD but if I changed to LONG, it ITOA does not work
+    ; This issue has taken care at EA_EXTENDED
+    CMP.B    #1,D0 ; check if the EA is MOVE
+    BEQ      ITOA_MOVE
+    CMP.B    #2,D0 ; check if the EA is MOVE
+    BEQ      ITOA_MOVE
+    BRA      ITOA
 
 ITOA:
 	MOVEM.L	    D0-D1, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
@@ -426,7 +449,7 @@ ITOA_BYTE:
 
 ITOA_WORD:
 	MOVE.W	    (A5), D7		    ; D7 = *A5;
-	MOVE.B      #right8, D1		
+	MOVE.B   #right8, D1		
 	LSR.W	    D1, D7
 	JSR	        ITOA_BYTE_CONVERT	; itoa_upper (D7)
 	MOVE.W	    (A5)+, D7
@@ -437,7 +460,7 @@ ITOA_LONG:
 	MOVE.W	    (A5), D7		    ; D7 = *A5;
 	MOVE.B	    #right8, D1
 	LSR.W	    D1,D7
-	JSR	        ITOA_BYTE_CONVERT	; itoa_upper(D7)
+	JSR  ITOA_BYTE_CONVERT	; itoa_upper(D7)
 	MOVE.W	    (A5)+, D7
 	JSR 	    ITOA_BYTE_CONVERT	; itoa_lower(D7)
 	
