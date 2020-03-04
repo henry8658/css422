@@ -12,9 +12,11 @@ nibble2             EQU         $0F00
 nibble3             EQU         $00F0
 nibble4             EQU         $000F
 dstmode             EQU         $10CA
+dstmode_Bi                      EQU                 %0000000111000000   
 srcmode             EQU         $0038
-dstmode_low2        EQU         $00C0 ; dest mode lower 2bits
-srcmode_low2        EQU         $0018 ; source mode lower 2 bits
+srcmode_Bi                      EQU                 %0000000000111000   
+dstmode_low2        EQU         %0000000011000000 ; dest mode lower 2bits
+srcmode_low2        EQU         %0000000000011000 ; source mode lower 2 bits
 dstreg              EQU         $0E00 ; dest regs
 srcreg              EQU         $0007 ; src regs
 
@@ -33,7 +35,7 @@ SAMPLE_ADDR         EQU         $00000400
 START:                  ; first instruction of program
     LEA     buffer,A2
     
-    MOVE.L  #$020000E2,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$E1798102,(A3) ; load test example instruction If you want to test, change this value
     MOVE.W  #$7890, 4(A3)
     
 
@@ -137,7 +139,7 @@ code0010:
     ; MOVE.l / MOVEA.l
     
     MOVE.L  D0, D1              ; D1 = D0 (current instruction word)
-    ANDI.W  #dstmode, D1        ; destination mode (Dn vs An)
+    ANDI.W  #dstmode_Bi, D1        ; destination mode (Dn vs An)
     MOVE.B  #6, D2              ; D2 Shift Counter= 6
     LSR.W   D2, D1              ; get the 2nd nibble in D1
     CMP.B   #1, D1              ; if the 2nd nibble is 001
@@ -148,7 +150,7 @@ code0011:
     ; MOVE.w / MOVEA.w
     
     MOVE.L  D0, D1              ; D1 = D0 (current instruction word)
-    ANDI.W  #dstmode, D1              ; destination mode (Dn vs An)
+    ANDI.W  #dstmode_Bi, D1              ; destination mode (Dn vs An)
     MOVE.B  #6, D2              ; D2 Shift Counter = 6
     LSR.W   D2, D1              ; get the 2nd nibble in D1
     CMP.B   #1, D1              ; if Destination mode is 001
@@ -206,12 +208,12 @@ code0111:
 code1000:
     ;   DIVS     / DIVU      /OR.bwl
 
-    MOVE.B  #13, D0             ;TASK 13
-    LEA     test_1000, A1
-    TRAP    #15
+    ;MOVE.B  #13, D0             ;TASK 13
+    ;LEA     test_1000, A1
+    ;TRAP    #15
     
     MOVE.L  D0, D1              ; copy current instrunction into D1
-    ANDI.W  #dstmode, D1        ; get the destination mode
+    ANDI.W  #dstmode_Bi, D1        ; get the destination mode
     MOVE.B  #6, D2              ; D2 Shift Counter = 6
     LSR.W   D2, D1              ; Getting destination mode in D1
     CMP.B   #$3, D1             ; if destination mode == 011
@@ -224,7 +226,7 @@ code1000:
 
 OP_SBCD_OR:
     MOVE.L  D0, D1              ; copy current instruction into D1
-    ANDI.W  #srcmode, D1        ; get the source mode
+    ANDI.W  #srcmode_Bi, D1        ; get the source mode
     MOVE.B  #3, D2              ; D2 Shift Counter = 3
     LSR.W   D2, D1              ; get src mode in D1
     CMP.B   #$1, D1             ; if srcmode <= 001
@@ -234,12 +236,12 @@ OP_SBCD_OR:
 code1001:
     ;   SUB.bwl  /  SUBA.wl 
     
-    MOVE.B  #13, D0             ;task #13
-    LEA     test_1001,A1    
-    TRAP    #15
+    ;MOVE.B  #13, D0             ;task #13
+    ;LEA     test_1001,A1    
+    ;TRAP    #15
     
     MOVE.L  D0, D1              ; copy instruction code       
-    ANDI.W  #dstmode, D1        ; get the destination mode into D1
+    ANDI.W  #dstmode_Bi, D1        ; get the destination mode into D1
     MOVE.B  #6, D2              ; D2 Shift Counter = 6
     LSR.W   D2, D1              ; get the destination mode to First Nibble for comparison
     CMP.B   #$3, D1             ; if destmode == 011 
@@ -251,7 +253,7 @@ code1001:
     JMP     OP_SUB              ; else SUB
 OP_SUBX_SUB:
     MOVE.L  D0, D1              ; copy instruction code
-    ANDI.W  #srcmode, D1        ; get the source mode into D1
+    ANDI.W  #srcmode_Bi, D1        ; get the source mode into D1
     MOVE.B  #3, D2              ;  D2 Shift Counter = 3
     LSR.W   D2, D1              ;  get src mode in D1
     CMP.B   #$1, D1             ; if srcmode <= 001
@@ -270,9 +272,9 @@ code1010:
 code1011:
     ;   CMP.bwl   / Not Supporting (CMPA.wl)    /EOR.bwl
 
-    MOVE.B  #13, D0
-    LEA     test_1011, A1
-    TRAP    #15
+    ;MOVE.B  #13, D0
+    ;LEA     test_1011, A1
+    ;TRAP    #15
     
     MOVE.L  D0, D1              ; get the current instruction into D1
     ANDI.W  #$00F0, D1          ; get 3rd nibble in D1  
@@ -289,7 +291,7 @@ code1011:
                                 ; CMP
     
     MOVE.L  D0, D1              ; get the current instruction into D1
-    ANDI.W  #srcmode, D1        ; get the source mode into D1
+    ANDI.W  #srcmode_Bi, D1        ; get the source mode into D1
     MOVE.B  #3, D2              ;  D2 Shift Counter = 3
     LSR.W   D2, D1              ; bring the source mode to last nibble
     CMP.B   #1, D1              ;   if srcmode == 1
@@ -301,12 +303,12 @@ code1011:
 code1100:
     ;   MULS      / MULU      /AND.bwl
 
-    MOVE.B  #13, D0             ;task #13
-    LEA     test_1100, A1
-    TRAP    #15
+    ;MOVE.B  #13, D0             ;task #13
+    ;LEA     test_1100, A1
+    ;TRAP    #15
     
     MOVE.L  D0, D1              ; get current instruction again
-    ANDI.W  #dstmode, D1        ; get the destination mode into D1
+    ANDI.W  #dstmode_Bi, D1        ; get the destination mode into D1
     MOVE.B  #6, D2              ; D2 Shift Counter = 6
     LSR.W   D2, D1
     CMP.B   #3, D1              ; if dstmode == 011
@@ -320,22 +322,22 @@ code1100:
     
 OP_POSSIBLE_AND:
     MOVE.L  D0, D1              ; get current instruction
-    ANDI.W  #srcmode, D1        ; get the source mode in to D1
+    ANDI.W  #srcmode_Bi, D1        ; get the source mode in to D1
     MOVE.B  #3, D2              ; D2 Shift Counter = 3
     LSR.W   D2, D1              ; 
     CMP.B   #1, D1              ;  if source mode <= 1
-    BLE     OP_UNSUPPORTED      ;    Not Supported ABCD
+    BEQ     OP_UNSUPPORTED      ;    An can't be src
     JMP     OP_AND              ;  else -> AND     
     
 code1101:
     ; ADD.bwl   /  ADDA.wl  /(ADDX.bwl)
     
-    MOVE.B  #13, D0             ;task #13
-    LEA     test_1101, A1
-    TRAP    #15
+    ;MOVE.B  #13, D0             ;task #13
+    ;LEA     test_1101, A1
+    ;TRAP    #15
     
     MOVE.L  D0, D1              ; get the current instruction into D1
-    ANDI.W  #dstmode, D1        ; get the destination mode into D1
+    ANDI.W  #dstmode_Bi, D1        ; get the destination mode into D1
     MOVE.B  #6, D2              ; D2 Shift Counter = 6
     LSR.W   D2, D1              ; get dest mode to D1
     CMP.B   #$3, D1             ; if dest mode == 011 or 111
@@ -359,9 +361,9 @@ OP_POSSIBLE_ADD:
 code1110:
     ;   ASL.bwl   /   ASR.bwl / LSL.bwl / LSR.bwl /ROL.bwl / ROR.bwl  
 
-    MOVE.B  #13, D0             ;task #13
-    LEA     test_1110, A1
-    TRAP    #15 
+    ;MOVE.B  #13, D0             ;task #13
+    ;LEA     test_1110, A1
+    ;TRAP    #15 
     
     MOVE.L  D0, D1              ; get current instruction into D1   
     ANDI.W  #dstmode_low2, D1   ; get 6th and 7th bit
@@ -397,9 +399,11 @@ REG_SHIFT:
     MULU    #6, D1              ;
     
     MOVE.L  D0, D4              ;  get current instruction into D4
-    ANDI.W  #5, D4              ; bit 5
-    BEQ     DIR_RIGHT
-    JMP     DIR_LEFT
+    ANDI.W  #%0000000100000000, D4  ; get direction
+    LSR.W   #8, D4
+    CMP.B   #1,  D4
+    BEQ     DIR_LEFT
+    JMP     DIR_RIGHT
 
 code1111:
     ;   (--unassigned--)
@@ -414,7 +418,7 @@ code1111:
 OP_0000_TABLE:
     JMP     OP_ORI              ; 0: ORI
     JMP     OP_UNSUPPORTED      ; 1: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
-    JMP     OP_ANDI             ; 2: ANDI
+    JMP     OP_UNSUPPORTED     ; 2: ANDI
     JMP     OP_UNSUPPORTED      ; 3: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
     JMP     OP_SUBI             ; 4: SUBI
     JMP     OP_UNSUPPORTED      ; 5: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
@@ -463,7 +467,7 @@ OP_COND_TABLE:
     JMP     OP_VC               ; 8: BVC, DBVC, SVC
     JMP     OP_VS               ; 9: BVS, DBVS, SVS
     JMP     OP_PL               ; A: BPL, DBPL, SPL
-    JMP     OP_HI               ; B: BMI, DBMI, SMI
+    JMP     OP_MI               ; B: BMI, DBMI, SMI
     JMP     OP_GE               ; C: BGE, DBGE, SGE
     JMP     OP_LT               ; D: BLT, DBLT, SLT
     JMP     OP_GT               ; E: BGT, DBGT, SGT
@@ -480,7 +484,7 @@ LEFT_SHIFT_TABLE:
 *----------------------------------------------------------------------------   
 
 RIGHT_SHIFT_TABLE:
-    JMP     OP_ASL              ; ASR
+    JMP     OP_ASR              ; ASR
     JMP     OP_LSR              ; LSR
     JMP     OP_ROXR             ; ROXR
     JMP     OP_ROR              ; ROR
@@ -673,6 +677,9 @@ OP_EXT:
     MOVE.B  #'E', (A2)+
     MOVE.B  #'X', (A2)+
     MOVE.B  #'T', (A2)+
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_MOVEM:
     MOVE.B  #'M', (A2)+
@@ -681,13 +688,18 @@ OP_MOVEM:
     MOVE.B  #'E', (A2)+
     MOVE.B  #'M', (A2)+
     ;JSR     EA_START
-
+        ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_LEA:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'E', (A2)+
     MOVE.B  #'A', (A2)+
+        ; Load immediate type
     ;JSR     EA_START
-
+    JMP     OP_FINISH
+    
 *---- 0101 ------------------------------------------------------------------
 *----------------------------------------------------------------------------   
     ; 2/28/2020 2:17 PM
@@ -710,12 +722,19 @@ OP_ADDQ:
     MOVE.B  #'D', (A2)+
     MOVE.B  #'Q', (A2)+
        ;JMP EA_START
+           ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_SUBQ:
     MOVE.B  #'S', (A2)+
     MOVE.B  #'U', (A2)+
     MOVE.B  #'B', (A2)+
     MOVE.B  #'Q', (A2)+
        ;JMP EA_START
+           ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
        
 *---- 0110 ------------------------------------------------------------------
 ea_bcc_flag:
@@ -727,83 +746,130 @@ OP_RA:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'A', (A2)+
     JMP OP_FINISH
+        ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_SR:
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
     JMP OP_FINISH
-    
+        ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_HI:
     MOVE.B  #'H',   (A2)+
     MOVE.B  #'I',   (A2)+
     JMP OP_FINISH
+        ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_LS:
     MOVE.B  #'L',   (A2)+
     MOVE.B  #'S',   (A2)+  
     JMP OP_FINISH
+        ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_CC:
     MOVE.B  #'C', (A2)+
     MOVE.B  #'C', (A2)+
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_CS:
     MOVE.B  #'C',   (A2)+
     MOVE.B  #'S',   (A2)+  
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_NE:
     MOVE.B  #'N',   (A2)+
     MOVE.B  #'E',   (A2)+  
     JMP OP_FINISH
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
     
 OP_EQ:
     MOVE.B  #'E',   (A2)+
     MOVE.B  #'Q',   (A2)+     
     JMP OP_FINISH
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
  
 OP_VC:
     MOVE.B  #'V',   (A2)+
     MOVE.B  #'C',   (A2)+  
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_VS:
     MOVE.B  #'V',   (A2)+
     MOVE.B  #'S',   (A2)+    
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_PL:
     MOVE.B  #'P',   (A2)+
     MOVE.B  #'L',   (A2)+   
         JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_MI:
         MOVE.B      #'M',   (A2)+   
         MOVE.B      #'I',   (A2)+       
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_GE:
     MOVE.B  #'G',   (A2)+
     MOVE.B  #'E',   (A2)+  
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_LT:
     MOVE.B  #'L',   (A2)+
     MOVE.B  #'T',   (A2)+      
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_GT:
     MOVE.B  #'G',   (A2)+
     MOVE.B  #'T',   (A2)+  
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 OP_LE:
     MOVE.B  #'L',   (A2)+
     MOVE.B  #'E',   (A2)+  
     JMP OP_FINISH
-
+    ; Load immediate type
+    ;JSR     EA_START
+    JMP     OP_FINISH
+    
 *---- 0111 ------------------------------------------------------------------
 OP_MOVEQ:
     MOVE.B  #'M', (A2)+
@@ -970,7 +1036,7 @@ OP_INVALID:
 ERROR_HANDLER:  
     MULU        #6, D1              ; FOR JUMPING TO DESIGNATED ERROR MSG
     LEA         ERROR_TABLE, A0
-    JSR         0(A0, D1)
+    JMP         0(A0, D1)
     ;JMP         USER_INPUT         ; To the beginning
     ;RTS    
     
@@ -1071,6 +1137,10 @@ EXIT:
 
 
 
+*~Font name~Courier New~
+*~Font size~10~
+*~Tab type~1~
+*~Tab size~4~
 *~Font name~Courier New~
 *~Font size~10~
 *~Tab type~1~
