@@ -36,26 +36,70 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.W  #$E766,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$D1781234,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #6,D1 ; D1 for processing EA Type
+    MOVE.B  #7,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
     JMP     0(A0,D1) ; jump to ea table according to D1 value
 
 EA_TYPE_TABLE:
-    JMP     EA_IMMEDIATE ; EA_TYPE 0
-    JMP     EA_MOVE ;1
-    JMP     EA_MOVEA ;2
-    JMP     EA_LEA ;3
-;    JMP     EA_DST_ONLY ;4
+    JMP     EA_IMMEDIATE ; EA_TYPE 0  ORI, ANDI, SUBI, ADDI, EORI, CMPI
+    JMP     EA_MOVE ;1 MOVE
+    JMP     EA_MOVEA ;2 MOVEA
+    JMP     EA_LEA ;3 LEA
+;    JMP     EA_DST_ONLY ;4 
 ;    JMP     EA_EXT ;5
 ;    JMP     EA_MOVEM ;6
-;    JMP     EA_TRAP ;7
+;    JMP     EA_TRAP ;7 TRAP
     JMP     EA_QUICK ; ADDQ, SUBQ ;8
-    JMP     EA_BRANCH ;9
-    JMP     EA_SHIFT ; 10 
+    JMP     EA_BRANCH ;9 Bcc, BRA, BSR
+    JMP     EA_SHIFT ; 10 ASL, ASR, LSL, LSR, ROL, ROR
+    JMP     EA_EXTRA ; 11 SUB, ADD
+
+
+        
+EA_EXTRA:
+    MOVE.W  (A3),D2
+    MOVE.W  (A3),D5
+    ADDI    #2,D4 ; insturction word displacement
+    ANDI.W  #%0000000011000000,D2 extracting size to 
+    ASR.W   #6,D2
+    JSR     EA_SIZE_EXTRACT
+    ANDI.W  #%0000000100000000,D5 ; check if the data register is src
+    ASR.W   #8,D5 
+    CMP     #0,D5 
+    BEQ     EA_OPMODE_FIRST
+    BRA     EA_OPMODE_SECOND
+    
+EA_OPMODE_FIRST:
+    JSR     EA_CALCULATE_SRC
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'D',(A2)+
+    MOVE.W  (A3),D3
+    ANDI.W  #%0000111000000000,D3
+    MOVE.B  #9,D5
+    ASR.W   D5,D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
+
+EA_OPMODE_SECOND:
+    MOVE.B  #'D',(A2)+
+    ANDI.W  #%0000111000000000,D3
+    MOVE.B  #9,D5
+    ASR.W   D5,D3
+    JSR     INSERT_REG_NUM
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.W  (A3),D5 ; check if the mode i
+    ANDI    #%0000000000111000,D5
+    ASR.W   #3,D5
+    CMP     #0,D5 ; check invalid address mode Data Register
+    BEQ     ERROR
+    JSR     EA_SRC_AS_DST
+    JMP     FINISH_EA
 
 EA_MOVE:
     JSR     EA_MOVE_SIZE
@@ -633,6 +677,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
