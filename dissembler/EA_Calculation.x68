@@ -36,9 +36,9 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$60000002,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.W  #$E766,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #5,D1 ; D1 for processing EA Type
+    MOVE.B  #6,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -55,6 +55,7 @@ EA_TYPE_TABLE:
 ;    JMP     EA_TRAP ;7
     JMP     EA_QUICK ; ADDQ, SUBQ ;8
     JMP     EA_BRANCH ;9
+    JMP     EA_SHIFT ; 10 
 
 EA_MOVE:
     JSR     EA_MOVE_SIZE
@@ -217,6 +218,83 @@ EA_IMMEDIATE:
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
     JSR     EA_SRC_AS_DST
+    JMP     FINISH_EA
+    
+    EA_PUT_0AS8:
+    MOVE.B  #8,D3
+    JSR     INSERT_REG_NUM ; insert 8
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #',',(A2)+
+    JSR     EA_CALCULATE_SRC
+    JMP     FINISH_EA
+    
+EA_SHIFT:
+    MOVE.W  (A3), D5 ; Check if one or two operand
+    ANDI.W  #%0000111011000000, D5
+    LSR.W   #6,D5
+    CMP     #3,D5
+    BEQ     EA_SHIFT_ONE_OPERAND
+    BRA     EA_SHIFT_TWO_OPERAND
+    
+EA_SHIFT_ONE_OPERAND:
+    MOVE.W  (A3), D2 ; Check if it has invalid address mode Dn
+    ANDI.W  #%0000000000111000,D2
+    LSR.W   #3,D2
+    CMP     #0,D2 ; if it is Dn
+    BEQ     ERROR ; throw error
+    ADDI    #2,D4
+    JSR     EA_SRC_AS_DST ; calculate destination 
+    JMP     FINISH_EA 
+   
+EA_SHIFT_TWO_OPERAND:
+    ADDI    #2,D4 ; instruction word displacement
+    MOVE.W  (A3), D2 ; Check size D2
+    ANDI.W  #%0000000011000000,D2 
+    LSR.W   #6,D2
+    MOVE.W  (A3), D1 ; Check the register num D3
+    ANDI.W  #%0000000000000111, D1
+    JSR     EA_SIZE_EXTRACT
+    MOVE.W  (A3), D3 ; save count num at D3
+    ANDI.W  #%0000111000000000, D3
+    MOVE.B  #9,D5
+    LSR.W   D5,D3
+    MOVE.W  (A3), D5 ; Check if the first operand is Data register
+    ANDI.W  #%0000000000100000, D5 
+    LSR.W   #5,D5
+    CMP     #1,D5
+    BEQ     EA_SHIFT_INSERT_DATA_REG
+    CMP     #0,D3
+    BEQ     EA_SHIFT_PUT_0AS8
+    MOVE.B  #'#',(A2)+
+    MOVE.B  #'$',(A2)+
+    JSR     INSERT_REG_NUM
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'D',(A2)+
+    MOVE.B  D1,D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
+    
+EA_SHIFT_INSERT_DATA_REG:
+    MOVE.B  #'D',(A2)+
+    JSR     INSERT_REG_NUM
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'D',(A2)+
+    MOVE.B  D1,D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
+    
+EA_SHIFT_PUT_0AS8:
+    MOVE.B  #'#',(A2)+
+    MOVE.B  #'$',(A2)+
+    MOVE.B  #8,D3
+    JSR     INSERT_REG_NUM
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'D',(A2)+
+    MOVE.B  D1,D3
+    JSR     INSERT_REG_NUM
     JMP     FINISH_EA
     
 INSERT_SIZE_B_TO_BUFFER:
@@ -555,6 +633,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
