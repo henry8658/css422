@@ -18,7 +18,12 @@ srcmode_low2        EQU         $0018 ; source mode lower 2 bits
 dstreg              EQU         $0E00 ; dest regs
 srcreg              EQU         $0007 ; src regs
 
-right3              EQU         3 ;
+bufsize     EQU     64 ; 64 characters can be stored in buffer
+right3      EQU 3
+right4      EQU 4
+right8      EQU 8
+right16     EQU 16
+right24     EQU 24
 
 SAMPLE_ADDR         EQU         $00000400
 
@@ -26,9 +31,11 @@ SAMPLE_ADDR         EQU         $00000400
     ORG    $1000
     
 START:                  ; first instruction of program
+    LEA     buffer,A2
     
+    MOVE.L  #$020000E2,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.W  #$7890, 4(A3)
     
-    LEA     $600, A5    ; Setting user input for start address as 600
 
 *----------------------------------------------------------------------------   
 *
@@ -43,6 +50,7 @@ START:                  ; first instruction of program
 *   A0 = OP_TABLE, OP_0000_TABLE
 *   A1 = a pointer to a message to print out
 *   A2 = a pointer to decded_buf
+*   A5 = a pointeer to current instruction
 *   }
 *----------------------------------------------------------------------------   
 OP_START:    
@@ -59,14 +67,20 @@ OP_START:
      
     LEA     OP_TABLE, A0        ; A0, points OP_TABLE
     CLR.L   D0                  ; Clears D0
-    MOVE.W  (A5)+, D0           ; Load the current instruction word to D0
+    MOVE.W  (A3)+, D0           ; Load the current instruction word to D0
     MOVE.L  D0, D1              ; D1 = D0 
     MOVE.B  #12, D2             ; D2 = 12
     LSR.W   D2, D1              ; get and save the OP code to D1
     MULU    #6, D1              ; compute the opcode jump displacement
     JMP     0(A0, D1)           ; jump to the opcode table entry
     
-OP_FINISH:  
+OP_FINISH: 
+    MOVE.B  #0,(A2)+
+    LEA     buffer,A1
+    MOVE.B  #13,D0
+    TRAP    #15
+    
+    JMP     EXIT
     ;MOVEM.L    (SP)+, D2/A6,    ; pop D2(source line # ) and A6 (end address)
     ;RTS                        ; return to the main
     
@@ -112,7 +126,7 @@ code0000:
     ANDI.W  #$0F00, D1          ; 2nd NIBBLE
     MOVE.B  #8, D2              ; D2 Shift Counter = 8
     LSR.W   D2, D1              ; 2nd nibble move to the last nibble
-    MULU    $6, D1              ; compute the op_0000_table jump displacement
+    MULU    #6, D1              ; compute the op_0000_table jump displacement
     LEA     OP_0000_TABLE, A0   ; A0 pointing OP_0000_Table
     JMP     0(A0, D1)
     
@@ -1042,9 +1056,12 @@ test_1101       DC.B            'code 1101', $0
 test_1110       DC.B            'code 1110', $0 
 test_1111       DC.B            'code 1111', $0 
 
+buffer  DS.B    bufsize ; buffer 
+
 EXIT:   
     SIMHALT             ; halt simulator
     END    START        ; last line of source
+
 
 
 

@@ -32,11 +32,13 @@ START:                  ; first instruction of program
 ; we might have to combine logic in ATOI
 
 EA_START:
+    MOVE.L  #$1000, D7
+    
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$31FC1234,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$60000002,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #1,D1 ; D1 for processing EA Type
+    MOVE.B  #5,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -180,21 +182,24 @@ EA_BRANCH:
     BEQ     Bcc_Extend  ;       00 = W
 
     ;   else Byte size   
-    ADDI.W  #$2, D2
-    ADD.L  D7, D2      ;
+    ADDI.W  #$2, D2     
+    ADD.L   D7, D2      ;
     MOVE.L  D2, D6      ;   D6 = PC + (DISPLACEMENT + 2)
+    
+    ; D2 = BYTE SIZE 
     JSR     START_ITOA
       
-    JMP    FINISH_EA
+    JMP     FINISH_EA
     
     
 Bcc_Extend:
+    ;MOVE
     JSR     EA_Bcc_EXTENDED
     ADDI.L  #$2, D6     
-    ADD.L  D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
+    ADD.L   D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
     
-    JSR    START_ITOA
-   
+    JSR     START_ITOA
+    
     JMP     FINISH_EA
 
         
@@ -204,7 +209,6 @@ EA_IMMEDIATE:
     ROR.W   #6,D2 ; rotating D1 to calculate Size
     ADDI    #2,D4 ; instruction word displacement
     JSR     EA_SIZE_EXTRACT ; after this process D1 will have information about Data Size
-    ADDI    #2,D4 ; instruction word displacement    ; generate immediate data
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED ; to process immediate data
@@ -551,6 +555,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
