@@ -36,9 +36,9 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$60FA0004,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$C3FC04D2,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #5,D1 ; D1 for processing EA Type
+    MOVE.B  #8,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -57,6 +57,27 @@ EA_TYPE_TABLE:
     JMP     EA_BRANCH ;9 Bcc, BRA, BSR
     JMP     EA_SHIFT ; 10 ASL, ASR, LSL, LSR, ROL, ROR
     JMP     EA_EXTRA ; 11 SUB, ADD
+    JMP     EA_MUL_DIV ; MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
+      
+      
+EA_MUL_DIV:
+    ADDI    #2, D4 ; insturction word displacement
+    MOVE.W  (A3),D1
+    ANDI.W  #%0000000000111000,D1
+    ASR.W   #3,D1
+    CMP     #1,D1 ; Check Invalid Address Mode 
+    BEQ     ERROR   ; Invalid Address Mode An (001)
+    MOVE.B  #$01,D2 ; Size is always Word only
+    JSR     EA_CALCULATE_SRC
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'D',(A2)+
+    MOVE.W  (A3),D3 ; read the opcode for reg num
+    ANDI.W  #%0000111000000000,D3 ; register number for data register
+    MOVE.B  #9,D5
+    ASR.W   D5,D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
       
 EA_EXTRA:
     MOVE.W  (A3),D2
@@ -265,7 +286,7 @@ EA_IMMEDIATE:
     JSR     EA_SRC_AS_DST
     JMP     FINISH_EA
     
-    EA_PUT_0AS8:
+EA_PUT_0AS8:
     MOVE.B  #8,D3
     JSR     INSERT_REG_NUM ; insert 8
     MOVE.B  #' ',(A2)+
@@ -430,7 +451,7 @@ EA_Bcc_EXTENDED:
 EA_WORD_DATA:
     MOVE.W   (A3,D4),D6 ; move A3 word and read word data
     ADDI      #2,D4 ; pc displacement = 2 
-    MOVE.L   D6, (A5) ; Insert word data
+    MOVE.W   D6, (A5) ; Insert word data ; It has to be word data read here
     RTS ; return to EA Calculate
     
 EA_LONG_DATA:
@@ -691,6 +712,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 *~Font name~Courier New~
 *~Font size~11~
 *~Tab type~1~
