@@ -36,9 +36,9 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$D1781234,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$60000004,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #7,D1 ; D1 for processing EA Type
+    MOVE.B  #5,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -57,9 +57,7 @@ EA_TYPE_TABLE:
     JMP     EA_BRANCH ;9 Bcc, BRA, BSR
     JMP     EA_SHIFT ; 10 ASL, ASR, LSL, LSR, ROL, ROR
     JMP     EA_EXTRA ; 11 SUB, ADD
-
-
-        
+      
 EA_EXTRA:
     MOVE.W  (A3),D2
     MOVE.W  (A3),D5
@@ -229,7 +227,7 @@ EA_BRANCH:
     ;   else Byte size   
     ADDI.W  #$2, D2     
     ADD.L   D7, D2      ;
-    MOVE.L  D2, D6      ;   D6 = PC + (DISPLACEMENT + 2)
+    MOVE.L  D2, (A5)      ;   D6 = PC + (DISPLACEMENT + 2)
     
     ; D2 = BYTE SIZE 
     JSR     START_ITOA
@@ -237,11 +235,12 @@ EA_BRANCH:
     JMP     FINISH_EA
     
     
-Bcc_Extend:
-    ;MOVE
-    JSR     EA_Bcc_EXTENDED
-    ADDI.L  #$2, D6     
-    ADD.L   D7, D6      ;   D6 = PC + (DISPLACEMENT +2)
+Bcc_Extend:    
+    JSR     EA_Bcc_EXTENDED ; displacement calc done
+    
+    ADDI.L  #$2, (A5)     
+    ADD.L   D7, (A5)      ;   (A5 == DISPLACEMENT) += (PC + 2)
+    MOVE.B    #$3, D2       ; Considering all the start address is in Long address
     
     JSR     START_ITOA
     
@@ -419,14 +418,17 @@ EA_EXTENDED:
     BRA       EA_WORD_DATA
     
 EA_Bcc_EXTENDED:
-    CMP.B     #$FF,D2 ; check if it's word or long size 
-    BEQ       EA_LONG_DATA
-    BRA       EA_WORD_DATA
+    ADDI      #2,D4 ; pc displacement = 2
+    CMP.B     #$00,D2 ; check if it's word or long size 
+    BEQ       EA_WORD_DATA
+    ADDI      #2,D4 ; pc displacement = 4
+    BRA       EA_LONG_DATA
+    
     
 EA_WORD_DATA:
     MOVE.W   (A3,D4),D6 ; move A3 word and read word data
     ADDI      #2,D4 ; pc displacement = 2 
-    MOVE.W   D6, (A5) ; Insert word data
+    MOVE.L   D6, (A5) ; Insert word data
     RTS ; return to EA Calculate
     
 EA_LONG_DATA:
@@ -545,7 +547,7 @@ START_ITOA:
     CMP.B    #2,D0 ; check if the EA is MOVE
     BEQ      ITOA_MOVE
     BRA      ITOA
-
+    
 ITOA:
 	MOVEM.L	    D0-D1, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
 	
@@ -575,7 +577,7 @@ ITOA_BYTE:
 
 ITOA_WORD:
 	MOVE.W	    (A5), D7		    ; D7 = *A5;
-	MOVE.B   #right8, D1		
+	MOVE.B      #right8, D1		
 	LSR.W	    D1, D7
 	JSR	        ITOA_BYTE_CONVERT	; itoa_upper (D7)
 	MOVE.W	    (A5)+, D7
@@ -599,19 +601,19 @@ ITOA_LONG:
 	JMP         ITOA_DONE
 
 ITOA_LONGADDR:
-	MOVE.W	    A5, D7			    ; D7= A5;
+	MOVE.w	    (A5), D7			    ; D7= A5;
 	MOVE.B	    #right24, D1
 	LSR.W 	    D1, D7
 	JSR	        ITOA_BYTE_CONVERT 	; itoa_upper (D7 >>24);
-	MOVE.W      A5, D7			    ; D7 = A5
+	MOVE.w      (A5)+, D7			    ; D7 = A5
 	MOVE.B	    #right16,  D1
 	LSR.W 	    D1, D7
 	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7 >> 16);
-	MOVE.W	    A5, D7			    ; D7 = A5
+	MOVE.w	    (A5), D7			    ; D7 = A5
 	MOVE.B	    #right8, D1
 	LSR.W	    D1,D7
 	JSR	        ITOA_BYTE_CONVERT	; itoa_upper (D7 >> 8);
-	MOVE.W	    A5, D7
+	MOVE.w	    (A5)+, D7
 	JSR	        ITOA_BYTE_CONVERT	; itoa_lower (D7);
 	JMP	        ITOA_DONE
 
@@ -683,6 +685,10 @@ buffer  DS.B    bufsize ; buffer
 
 
 
+*~Font name~Courier New~
+*~Font size~11~
+*~Tab type~1~
+*~Tab size~4~
 *~Font name~Courier New~
 *~Font size~11~
 *~Tab type~1~
