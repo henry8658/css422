@@ -36,9 +36,9 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$C3FC04D2,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.W  #$8240,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #8,D1 ; D1 for processing EA Type
+    MOVE.B  #7,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -56,7 +56,7 @@ EA_TYPE_TABLE:
     JMP     EA_QUICK ; ADDQ, SUBQ ;8
     JMP     EA_BRANCH ;9 Bcc, BRA, BSR
     JMP     EA_SHIFT ; 10 ASL, ASR, LSL, LSR, ROL, ROR
-    JMP     EA_EXTRA ; 11 SUB, ADD
+    JMP     EA_EXTRA ; 11 SUB, ADD, OR, AND, CMP
     JMP     EA_MUL_DIV ; MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
       
       
