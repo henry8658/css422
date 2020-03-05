@@ -36,7 +36,7 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.L  #$60000004,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$60FA0004,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
     MOVE.B  #5,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
@@ -225,11 +225,13 @@ EA_BRANCH:
     BEQ     Bcc_Extend  ;       00 = W
 
     ;   else Byte size   
-    ADDI.W  #$2, D2     
+    ADDI.w  #$2, D2     
     ADD.L   D7, D2      ;
     MOVE.L  D2, (A5)      ;   D6 = PC + (DISPLACEMENT + 2)
     
-    ; D2 = BYTE SIZE 
+    ; D2 = size 
+    MOVE.W  #$3, D2     ; Update Size for ITOA
+    ADDI.W  #2, D4      ; TO UPDATE START ADDRESs, after converting 
     JSR     START_ITOA
       
     JMP     FINISH_EA
@@ -239,8 +241,8 @@ Bcc_Extend:
     JSR     EA_Bcc_EXTENDED ; displacement calc done
     
     ADDI.L  #$2, (A5)     
-    ADD.L   D7, (A5)      ;   (A5 == DISPLACEMENT) += (PC + 2)
-    MOVE.B    #$3, D2       ; Considering all the start address is in Long address
+    ADD.L   D7, (A5)         ;   (A5 == DISPLACEMENT) += (PC + 2)
+    MOVE.B   #$3, D2          ; Considering all the start address is in Long address
     
     JSR     START_ITOA
     
