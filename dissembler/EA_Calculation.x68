@@ -28,7 +28,6 @@ START:                  ; first instruction of program
 ; D7: PC COUNTER (DO NOT CHANGE)
 ; A3: Pointing Current Address of the Instruction 
 ; A5: buffer for ITOA
-
 ; we might have to combine logic in ATOI
 
 EA_START:
@@ -36,9 +35,9 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.W  #$8240,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.W  #$6002,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.W  #$7890, 4(A3)
-    MOVE.B  #7,D1 ; D1 for processing EA Type
+    MOVE.B  #6,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -50,15 +49,160 @@ EA_TYPE_TABLE:
     JMP     EA_MOVEA ;2 MOVEA
     JMP     EA_LEA ;3 LEA
 ;    JMP     EA_DST_ONLY ;4 
-;    JMP     EA_EXT ;5
-;    JMP     EA_MOVEM ;6
-;    JMP     EA_TRAP ;7 TRAP
-    JMP     EA_QUICK ; ADDQ, SUBQ ;8
-    JMP     EA_BRANCH ;9 Bcc, BRA, BSR
-    JMP     EA_SHIFT ; 10 ASL, ASR, LSL, LSR, ROL, ROR
-    JMP     EA_EXTRA ; 11 SUB, ADD, OR, AND, CMP
-    JMP     EA_MUL_DIV ; MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
+    JMP     EA_MOVEM ;5
+    JMP     EA_QUICK ; ADDQ, SUBQ ; 6
+    JMP     EA_BRANCH ;7 Bcc, BRA, BSR
+    JMP     EA_SHIFT ; 8 ASL, ASR, LSL, LSR, ROL, ROR
+    JMP     EA_EXTRA ; 9 SUB, ADD, OR, AND, CMP
+    JMP     EA_MUL_DIV ; 10 MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
+    JMP     EA_MOVEQ ; 11 MOVEQ
+    JMP     EA_ADDA ; 12 ADDA
+    
+EA_ADDA:
+    ADDI    #2,D4
+    JSR     EA_ADDA_SIZE
+    JSR     EA_CALCULATE_SRC
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.B  #'A',(A2)+
+    MOVE.W  (A3),D3
+    ANDI.W  #%0000000111000000,D3
+    ASR.W   #6,D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
+    
+EA_ADDA_SIZE:
+    MOVE.W  (A3),D2
+    ANDI.W  #%0000000111000000,D2
+    ASR.W   #6,D2
+    CMP     #3,D2
+    BEQ     INSERT_SIZE_W_TO_BUFFER
+    CMP     #7,D2
+    BEQ     INSERT_SIZE_L_TO_BUFFER
+    BRA     ERROR
       
+EA_MOVEQ:
+    ADDI    #2, D4
+    MOVE.W  (A3), D6 ; extract immediate data
+    ANDI.W  #%0000000011111111, D6
+    MOVE.W  D6, (A5) ; give this value to ITOA
+    CMP.B   #%00, D2
+    MOVE.B  #'#', (A2)+
+    MOVE.B  #'$', (A2)+
+    JSR     ITOA
+    MOVE.B  #',', (A2)+
+    MOVE.B  #' ', (A2)+
+    MOVE.B  #'D', (A2)+
+    MOVE.W  (A3), D3 ; reg num
+    ANDI.W  #%0000111000000000, D3
+    MOVE.B  #9, D5 
+    ASR.W   D5, D3
+    JSR     INSERT_REG_NUM
+    JMP     FINISH_EA
+      
+EA_MOVEM:
+    ADDI    #4, D4 ; insturction long displacement
+    MOVE.W  (A3),D2 ; Size check
+    JSR     EA_MOVEM_SIZE
+    MOVE.B  #15, D5 ; save masking bit place num
+    MOVE.W  (A3),D3 ;
+    BTST    #10,D3 ; check if reg to mem or mem to reg
+    MOVE.L  #0, D6 ; counter for slash
+    BEQ     EA_MOVEM_REG_TO_MEM
+    MOVE.W  (A3), D1
+    ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
+    ASR.W   #3,D1 ;
+    CMP     #4,D1 ; checking invalid address mode
+    BEQ     ERROR
+    JSR     EA_SRC_AS_DST
+    MOVE.B  #',', (A2)+
+    MOVE.B  #' ', (A2)+
+    MOVE.W  #15, D5 ; save masking bit place num
+    MOVE.L  #0, D6 ; counter for slash
+    BRA     EA_MOVEM_MEM_TO_REG
+      
+EA_MOVEM_SIZE:
+    BTST    #6,D2
+    BEQ     INSERT_SIZE_W_TO_BUFFER
+    BRA     INSERT_SIZE_L_TO_BUFFER
+   
+; use bit test to check the masking
+EA_MOVEM_REG_TO_MEM:
+    MOVE.W  2(A3),D3 ; extracting masking bit
+    MOVE.B  D5, D1 ; temp
+    EORI.B  #%1111, D1 ; extracting reg num
+    ANDI.B  #%0111, D1 ; filter reg num
+    BTST    D5, D3    
+    BNE     EA_INSERT_REG_TO_MEM
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    ADDI.B  #1, D6 ; counting for slash
+    BRA     EA_MOVEM_REG_TO_MEM
+
+EA_INSERT_REG_TO_MEM:
+    JSR     EA_INSERT_SLASH
+    MOVE.W  D1, D3 ; move the reg num from D1
+    MOVE.B  D5, D1
+    EORI.B  #%1000,D1
+    ASR.B   #3,D1
+    MULU    #6,D1
+    LEA     ADDRESS_MODE_TABLE, A0
+    JSR     0(A0, D1)
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    ADDI.B  #1, D6 ; counting for slash
+    BRA     EA_MOVEM_REG_TO_MEM
+    
+EA_INSERT_SLASH:
+    CMP.B   #0,D6
+    BNE     PUT_SLASH
+    RTS
+    
+PUT_SLASH:
+    MOVE.B  #'/',(A2)+
+    RTS
+
+EA_MOVEM_MEM_TO_REG:
+    MOVE.W  2(A3),D3 ; extracting masking bit
+    MOVE.B  D5, D1 ; temp
+    EORI.B  #%0000, D1 ; extracting reg num
+    ANDI.B  #%0111, D1 ; filter reg num
+    BTST    D5, D3    
+    BNE     EA_INSERT_MEM_TO_REG
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     FINISH_EA
+    SUBI.B  #1, D5 ; check next mask bit
+    ADDI.B  #1, D6 ; counting for slash
+    BRA     EA_MOVEM_MEM_TO_REG
+      
+EA_INSERT_MEM_TO_REG:
+    JSR     EA_INSERT_SLASH
+    MOVE.W  D1, D3 ; move the reg num from D1
+    MOVE.B  D5, D1
+    EORI.B  #%0000,D1
+    ASR.B   #3,D1
+    MULU    #6,D1
+    LEA     ADDRESS_MODE_TABLE, A0
+    JSR     0(A0, D1)
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     FINISH_EA
+    ADDI.B  #1, D6 ; counting for slash
+    SUBI.B  #1, D5 ; check next mask bit
+    BRA     EA_MOVEM_MEM_TO_REG
+      
+EA_MOVEM_FINISH:
+    MOVE.B  #',',(A2)+
+    MOVE.B  #' ',(A2)+
+    MOVE.W  (A3), D1
+    ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
+    ASR.W   #3,D1 ;
+    CMP     #3,D1 ; checking invalid address mode
+    BEQ     ERROR
+    JSR     EA_SRC_AS_DST
+    JMP     FINISH_EA
+    
       
 EA_MUL_DIV:
     ADDI    #2, D4 ; insturction word displacement
@@ -238,35 +382,28 @@ EA_QUICK_DATA:
     JMP     FINISH_EA
     
 EA_BRANCH:
-    MOVE.W  (A3), D2      ;   NEED TO CHECK [ANDI.W #$00FF]
-    ANDI.W  #$00FF, D2  ;   If 00 || FF 
-    CMP.B   #$FF, D2    ; 
+    ADDI    #2,D4
+    MOVE.W  (A3), D3      ;   NEED TO CHECK [ANDI.W #$00FF]
+    ANDI.W  #$FF, D3  ;   If 00 || FF 
+    CMP.B   #$FF, D3    ; 
     BEQ     Bcc_Extend  ;       FF = Long
-    CMP.B   #$00, D2    
+    CMP.B   #$00, D3    
     BEQ     Bcc_Extend  ;       00 = W
 
     ;   else Byte size   
-    ADDI.w  #$2, D2     
-    ADD.L   D7, D2      ;
-    MOVE.L  D2, (A5)      ;   D6 = PC + (DISPLACEMENT + 2)
-    
-    ; D2 = size 
-    MOVE.W  #$3, D2     ; Update Size for ITOA
-    ADDI.W  #2, D4      ; TO UPDATE START ADDRESs, after converting 
+    ADDI    #$2, D3 ;      
+    ADD     D7,  D3      ;
+    MOVE    D3, (A5)      ;   D3 = PC + (DISPLACEMENT + 2)
+    MOVE    #%01, D2 ; tell ITOA it is Word data
     JSR     START_ITOA
-      
     JMP     FINISH_EA
     
     
 Bcc_Extend:    
     JSR     EA_Bcc_EXTENDED ; displacement calc done
-    
-    ADDI.L  #$2, (A5)     
-    ADD.L   D7, (A5)         ;   (A5 == DISPLACEMENT) += (PC + 2)
-    MOVE.B   #$3, D2          ; Considering all the start address is in Long address
-    
+    ADDI    #2,(A5) ; add word size 2 to D6 which is displacement
+    ADD     D7,(A5)         ;   (A5 == DISPLACEMENT) += (PC + 2)
     JSR     START_ITOA
-    
     JMP     FINISH_EA
 
         
@@ -279,7 +416,7 @@ EA_IMMEDIATE:
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED ; to process immediate data
-    JSR     ITOA
+    ;JSR     ITOA
     ; generate dest EA address
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -392,7 +529,7 @@ EA_SIZE_EXTRACT: ; extracting size for immediate data
 
 EA_SRC_AS_DST:
     MOVE.W  (A3),D1 ; D1: save mode num
-    MOVE.W  (A3),D3 ; D2: save reg num 
+    MOVE.W  (A3),D3 ; D3: save reg num 
     MOVE.W  (A3),D5 ; D5: checking invalid address mode for mode 111
     LSR.L   #2,D5 ; extrating mode and reg num for checking invalid mode 111
     CMP.B   #$F,D5 ; not supported in this  Immedate data address mode 
@@ -441,11 +578,23 @@ EA_EXTENDED:
     BRA       EA_WORD_DATA
     
 EA_Bcc_EXTENDED:
-    ADDI      #2,D4 ; pc displacement = 2
     CMP.B     #$00,D2 ; check if it's word or long size 
-    BEQ       EA_WORD_DATA
-    ADDI      #2,D4 ; pc displacement = 4
-    BRA       EA_LONG_DATA
+    BEQ       EA_WORD_BCC
+    BRA       EA_LONG_BCC
+    
+EA_WORD_BCC:
+    MOVE.W   (A3,D4),D6 ; move A3 word and read word data
+    ADDI      #2,D4 ; pc displacement = 2 
+    MOVE.W   D6, (A5) ; Insert word data ; It has to be word data read here
+    MOVE.B   #%01,D2 ; tell ITOA this is word data
+    RTS ; return to EA Calculate
+    
+EA_LONG_BCC:
+    MOVE.L   (A3,D4),D6 ; move A3 word and read long data
+    ADDI      #4,D4 ; pc displacement = 4
+    MOVE.L   D6, (A5) ; Insert long data
+    MOVE.B   #%10,D2 ; tell ITOA this is word data
+    RTS ; return to EA Calculate
     
     
 EA_WORD_DATA:
@@ -712,6 +861,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 *~Font name~Courier New~
 *~Font size~11~
