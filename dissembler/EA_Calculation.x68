@@ -31,13 +31,14 @@ START:                  ; first instruction of program
 ; we might have to combine logic in ATOI
 
 EA_START:
-    MOVE.L  #$1000, D7
+    MOVE.L  #$448, D7
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.W  #$6002,(A3) ; load test example instruction If you want to test, change this value!
-    MOVE.W  #$7890, 4(A3)
-    MOVE.B  #6,D1 ; D1 for processing EA Type
+    MOVE.W  #$60E6,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$5678ABCD, 4(A3)
+    MOVE.W  #$EF12, 8(A3)
+    MOVE.B  #7,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -48,7 +49,7 @@ EA_TYPE_TABLE:
     JMP     EA_MOVE ;1 MOVE
     JMP     EA_MOVEA ;2 MOVEA
     JMP     EA_LEA ;3 LEA
-;    JMP     EA_DST_ONLY ;4 
+    JMP     EA_CLR ;4 
     JMP     EA_MOVEM ;5
     JMP     EA_QUICK ; ADDQ, SUBQ ; 6
     JMP     EA_BRANCH ;7 Bcc, BRA, BSR
@@ -57,7 +58,93 @@ EA_TYPE_TABLE:
     JMP     EA_MUL_DIV ; 10 MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
     JMP     EA_MOVEQ ; 11 MOVEQ
     JMP     EA_ADDA ; 12 ADDA
+    JMP     EA_JJ   ; 12 JMP, JSR  
+
+EA_JJ:
+    MOVE.W  (A3), D1                  ; Move instruction to D1 for mode
+    ANDI.W  #%0000000000111000,D1   ; get mode
+    LSR.W   #$3, D1
     
+    MOVE.W  (A3), D3                  ; Move instruction to D3 for reg
+    ANDI.W  #%0000000000000111,D3   ; get reg
+    
+    CMP.B   #7, D1                  ; if src mode == 010 || 111
+    BEQ     EA_JJ_111
+                                    ;   LEA_SUCCESS
+    CMP.B   #2, D1
+    BEQ     EA_JJ_010
+                                    ; else
+    BRA     ERROR                   ;   ERROR
+        
+EA_JJ_010:   
+    MOVE.W  (A3), D5                  ; CHECKING MODE 111'S REG EDGE CASE
+    ANDI.W  #$000F, D5          
+    CMP.B   #$A, D5                 ; IF REG is not 000 || 001
+    BGE     ERROR                   ;  ERROR
+                                    ; ELSE
+                                                         
+    ADDI    #2,D4 ; instruction word displacement
+    JSR     EA_SRC_AS_DST           ;  process
+
+    JMP     FINISH_EA   
+
+EA_JJ_111:
+    MOVE.B  #' ', (A2)+
+    MOVE.B  #'$', (A2)+     ; Absolute Value
+    ADDI    #2, D4          ;  To read extended address
+    ADDI    #1, D2          ; ABSOLUTE SIZE + 1
+    CMP.B   #0, D3          ;IF ABSOLUTE SIZE 0
+    BEQ     JJ_000          ;   SKIP ABSOLUTE SIZE ++ 
+    CMP.B   #2, D3  
+    BGE     ERROR   
+    ADDI    #1, D2          ; BECAUSE #%10 IS FOR LONG   
+    
+JJ_000:
+    JSR     EA_EXTENDED
+    JSR     START_ITOA
+    JMP     FINISH_EA
+
+EA_CLR:
+    MOVE.W  (A3), D2                
+    ANDI.W  #%0000000011000000,D2   ; Extract EA size
+    LSR.W   #6, D2
+    JSR     EA_SIZE_EXTRACT         ;  Getting .B / .W / .L
+
+    MOVE.W  (A3), D1
+    ANDI.W  #%0000000000111000, D1  ; get mode
+    LSR.W   #3, D1
+    
+    MOVE.W  (A3), D3                ; Move instruction to D3 for reg
+    ANDI.W  #%0000000000000111,D3   ; get reg
+    
+    CMP.B   #$1, D1                 ; 001 An not supported
+    BEQ     ERROR
+    
+    CMP.B   #7, D1                  ; if src mode == 111
+    BEQ     EA_CLR_111
+    
+    JSR     EA_CALCULATE_SRC
+    
+    JMP     FINISH_EA
+    
+EA_CLR_111:
+    CLR     D2              ; In case (CLR.B $12341234)
+    MOVE.B  #' ', (A2)+
+    MOVE.B  #'$', (A2)+     ; Absolute Value
+    ADDI    #2, D4          ;  To read extended address
+    CMP.B   #0, D3          ;IF ABSOLUTE SIZE 0
+    BEQ     CLR_000          ;   SKIP ABSOLUTE SIZE ++ 
+    CMP.B   #2, D3  
+    BGE     ERROR   
+    ADDI    #1, D2          ; D2 = 0 + 1, BECAUSE #%10 IS FOR LONG AND #%01 FOR WORD
+    CLR_000:
+    ADDI    #1, D2          ; IF LONG ADDRESS D2 = 1 + 1 
+    JSR     EA_EXTENDED
+    JSR     START_ITOA
+    JMP     FINISH_EA
+
+
+
 EA_ADDA:
     ADDI    #2,D4
     JSR     EA_ADDA_SIZE
@@ -203,7 +290,6 @@ EA_MOVEM_FINISH:
     JSR     EA_SRC_AS_DST
     JMP     FINISH_EA
     
-      
 EA_MUL_DIV:
     ADDI    #2, D4 ; insturction word displacement
     MOVE.W  (A3),D1
@@ -383,6 +469,7 @@ EA_QUICK_DATA:
     
 EA_BRANCH:
     ADDI    #2,D4
+    MOVE.B  #'$',(A2)+
     MOVE.W  (A3), D3      ;   NEED TO CHECK [ANDI.W #$00FF]
     ANDI.W  #$FF, D3  ;   If 00 || FF 
     CMP.B   #$FF, D3    ; 
@@ -397,8 +484,7 @@ EA_BRANCH:
     MOVE    #%01, D2 ; tell ITOA it is Word data
     JSR     START_ITOA
     JMP     FINISH_EA
-    
-    
+   
 Bcc_Extend:    
     JSR     EA_Bcc_EXTENDED ; displacement calc done
     ADDI    #2,(A5) ; add word size 2 to D6 which is displacement
@@ -819,9 +905,7 @@ ITOA_DONE:
 	RTS
 
 ;----------------------------------------------------------
-    
-    
-    
+   
 ERROR:
     JMP     END
     
@@ -861,6 +945,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 *~Font name~Courier New~
