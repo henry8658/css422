@@ -39,12 +39,12 @@ START:                  ; first instruction of program
 ; we might have to combine logic in ATOI
 
 EA_START:
-    MOVE.L  #$41C, D7
+    MOVE.L  #$448, D7
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.W  #$6000,(A3) ; load test example instruction If you want to test, change this value!
-    MOVE.L  #$0E16ABCD, 2(A3)
+    MOVE.L  #$6000FCB6,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$0E16ABCD, 4(A3)
     MOVE.W  #$EF12, 8(A3)
     MOVE.B  #7,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
@@ -66,7 +66,7 @@ EA_TYPE_TABLE:
     JMP     EA_MUL_DIV ; 10 MULU, MULS, DIVU, DIVS ; size is fixed for this opcode always WORD
     JMP     EA_MOVEQ ; 11 MOVEQ
     JMP     EA_ADDA ; 12 ADDA
-    JMP     EA_JJ   ; 12 JMP, JSR  
+    JMP     EA_JJ   ; 13 JMP, JSR  
 
 EA_JJ:
     MOVE.W  (A3), D1                  ; Move instruction to D1 for mode
@@ -82,13 +82,13 @@ EA_JJ:
     CMP.B   #2, D1
     BEQ     EA_JJ_010
                                     ; else
-    BRA     ERROR                   ;   ERROR
+    BRA     EA_ERROR                   ;   ERROR
         
 EA_JJ_010:   
-    MOVE.W  (A3), D5                  ; CHECKING MODE 111'S REG EDGE CASE
+    MOVE.W  (A3), D5                ; CHECKING MODE 111'S REG EDGE CASE
     ANDI.W  #$000F, D5          
     CMP.B   #$A, D5                 ; IF REG is not 000 || 001
-    BGE     ERROR                   ;  ERROR
+    BGE     EA_ERROR                   ;  ERROR
                                     ; ELSE
                                                          
     ADDI    #2,D4 ; instruction word displacement
@@ -104,7 +104,7 @@ EA_JJ_111:
     CMP.B   #0, D3          ;IF ABSOLUTE SIZE 0
     BEQ     JJ_000          ;   SKIP ABSOLUTE SIZE ++ 
     CMP.B   #2, D3  
-    BGE     ERROR   
+    BGE     EA_ERROR   
     ADDI    #1, D2          ; BECAUSE #%10 IS FOR LONG   
     
 JJ_000:
@@ -126,7 +126,7 @@ EA_CLR:
     ANDI.W  #%0000000000000111,D3   ; get reg
     
     CMP.B   #$1, D1                 ; 001 An not supported
-    BEQ     ERROR
+    BEQ     EA_ERROR
     
     CMP.B   #7, D1                  ; if src mode == 111
     BEQ     EA_CLR_111
@@ -143,7 +143,7 @@ EA_CLR_111:
     CMP.B   #0, D3          ;IF ABSOLUTE SIZE 0
     BEQ     CLR_000          ;   SKIP ABSOLUTE SIZE ++ 
     CMP.B   #2, D3  
-    BGE     ERROR   
+    BGE     EA_ERROR   
     ADDI    #1, D2          ; D2 = 0 + 1, BECAUSE #%10 IS FOR LONG AND #%01 FOR WORD
     CLR_000:
     ADDI    #1, D2          ; IF LONG ADDRESS D2 = 1 + 1 
@@ -174,7 +174,7 @@ EA_ADDA_SIZE:
     BEQ     INSERT_SIZE_W_TO_BUFFER
     CMP     #7,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
-    BRA     ERROR
+    BRA     EA_ERROR
       
 EA_MOVEQ:
     ADDI    #2, D4
@@ -208,7 +208,7 @@ EA_MOVEM:
     ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
     ASR.W   #3,D1 ;
     CMP     #4,D1 ; checking invalid address mode
-    BEQ     ERROR
+    BEQ     EA_ERROR
     JSR     EA_SRC_AS_DST
     MOVE.B  #',', (A2)+
     MOVE.B  #' ', (A2)+
@@ -294,7 +294,7 @@ EA_MOVEM_FINISH:
     ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
     ASR.W   #3,D1 ;
     CMP     #3,D1 ; checking invalid address mode
-    BEQ     ERROR
+    BEQ     EA_ERROR
     JSR     EA_SRC_AS_DST
     JMP     FINISH_EA
     
@@ -304,7 +304,7 @@ EA_MUL_DIV:
     ANDI.W  #%0000000000111000,D1
     ASR.W   #3,D1
     CMP     #1,D1 ; Check Invalid Address Mode 
-    BEQ     ERROR   ; Invalid Address Mode An (001)
+    BEQ     EA_ERROR   ; Invalid Address Mode An (001)
     MOVE.B  #$01,D2 ; Size is always Word only
     JSR     EA_CALCULATE_SRC
     MOVE.B  #',',(A2)+
@@ -354,7 +354,7 @@ EA_OPMODE_SECOND:
     ANDI    #%0000000000111000,D5
     ASR.W   #3,D5
     CMP     #0,D5 ; check invalid address mode Data Register
-    BEQ     ERROR
+    BEQ     EA_ERROR
     JSR     EA_SRC_AS_DST
     JMP     FINISH_EA
 
@@ -378,7 +378,7 @@ EA_MOVE_SIZE:
     BEQ     INSERT_SIZE_W_TO_BUFFER
     CMP.B   #%10,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
-    BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
+    BRA     EA_ERROR  ; Throw Error here if size is 11 which is incorrect for this case
     
 EA_MOVEA:
     JSR     EA_MOVEA_SIZE
@@ -403,7 +403,7 @@ EA_MOVEA_SIZE:
     BEQ     INSERT_SIZE_W_TO_BUFFER
     CMP.B   #%10,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
-    BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
+    BRA     EA_ERROR  ; Throw Error here if size is 11 which is incorrect for this case
     
 EA_LEA:
     MOVE.W  (A3), D1                  ; Move instruction to D1 for mode
@@ -419,13 +419,13 @@ EA_LEA:
     CMP.B   #2, D1
     BEQ     LEA_SUCCESS         
                                     ; else
-    BRA     ERROR                   ;   ERROR
+    BRA     EA_ERROR                   ;   ERROR
         
 LEA_SUCCESS:
     MOVE.W  (A3), D5                  ; CHECKING MODE 111'S REG EDGE CASE
     ANDI.W  #$000F, D5          
     CMP.B   #$A, D5                 ; IF REG is not 000 || 001
-    BGE     ERROR                   ;  ERROR
+    BGE     EA_ERROR                   ;  ERROR
                                     ; ELSE
                           
     ADDI    #2,D4 ; instruction word displacement
@@ -454,7 +454,7 @@ EA_QUICK:
     MOVE.W  (A3),D1 ; dst mode
     LSR.W   #2,D1
     CMP.B   #$F,D1 ; unsupported EA immediate addr mode
-    BEQ     ERROR
+    BEQ     EA_ERROR
     MOVE.W  (A3),D3 ; calculate immediate data
     ANDI.W  #%0000111000000000,D3 ; filter data
     MOVE.B  #9,D5 ; save 9 to D5 to filter the data in 9th position 
@@ -491,8 +491,8 @@ EA_BRANCH:
     BEQ     EA_BRANCH_NEG 
     
     ;   else Byte size   
-    ADDI    #$2, D3 ;      
-    ADD     D7,  D3      ;
+    ADDI.L  #$2, D3 ;      
+    ADD.L   D7,  D3      ;
     MOVE    D3, (A5)      ;   D3 = PC + (DISPLACEMENT + 2)
     MOVE    #%01, D2 ; tell ITOA it is Word data
     JSR     START_ITOA
@@ -520,17 +520,17 @@ Bcc_Extend:
     BTST    #%1000000000000000, D3
     BEQ     Bcc_Extend_NEG
     
-    ADDI    #2,(A5) ; add word size 2 to D6 which is displacement
+    ADDI.L  #2,(A5) ; add word size 2 to D6 which is displacement
     ADD     D7,(A5)         ;   (A5 == DISPLACEMENT) += (PC + 2)
     JSR     START_ITOA
     JMP     FINISH_EA
     
-    Bcc_Extend_NEG:
+Bcc_Extend_NEG:
     EOR.W   #%1111111111111111, D3  ; converting two's complement
     SUBI    #1, D3                  ; converting two's complement
     MOVE.L  D7, D5  ; Copy current PC to D5
     SUB       D3, D5   
-    MOVE.w  D5, (A5)
+    MOVE.W  D5, (A5)
     JSR     START_ITOA
     JMP     FINISH_EA    
         
@@ -571,7 +571,7 @@ EA_SHIFT_ONE_OPERAND:
     ANDI.W  #%0000000000111000,D2
     LSR.W   #3,D2
     CMP     #0,D2 ; if it is Dn
-    BEQ     ERROR ; throw error
+    BEQ     EA_ERROR ; throw error
     ADDI    #2,D4
     JSR     EA_SRC_AS_DST ; calculate destination 
     JMP     FINISH_EA 
@@ -652,7 +652,7 @@ EA_SIZE_EXTRACT: ; extracting size for immediate data
     BEQ     INSERT_SIZE_W_TO_BUFFER
     CMP.B   #%10,D2
     BEQ     INSERT_SIZE_L_TO_BUFFER
-    BRA     ERROR  ; Throw Error here if size is 11 which is incorrect for this case
+    BRA     EA_ERROR  ; Throw Error here if size is 11 which is incorrect for this case
 
 EA_SRC_AS_DST:
     MOVE.W  (A3),D1 ; D1: save mode num
@@ -665,7 +665,7 @@ EA_SRC_AS_DST:
     ANDI.W  #%0000000000000111, D3 ; Extracting Reg for Dest
     LSR.W   #3,D1 ; 
     CMP.B   #1,D1 ; filter invalid An address mode for op code 0000
-    BEQ     ERROR ; Error Throw error for invalid address mode
+    BEQ     EA_ERROR ; Error Throw error for invalid address mode
     MULU    #6,D1 ; For address mode jump table 
     LEA     ADDRESS_MODE_TABLE, A0
     JMP     0(A0,D1)
@@ -788,11 +788,11 @@ MODE_100:
     
 MODE_101:
     ; Not supported
-    BRA     ERROR
+    BRA     EA_ERROR
 
 MODE_110:
     ; Not supported
-    BRA     ERROR
+    BRA     EA_ERROR
 
 MODE_111:
     BRA     FILTER_SUB_MODE_111     
@@ -809,7 +809,7 @@ FILTER_SUB_MODE_111:
     BEQ    REG_001
     CMP.B  #4,D3 ; Immediate Data
     BEQ    REG_100
-    BRA    ERROR ; If there is no match reg num
+    BRA    EA_ERROR ; If there is no match reg num
 
 REG_000:
     MOVE.B  #'$',(A2)+
@@ -839,8 +839,6 @@ REG_100:
 ; There is error in ITOA. If Long Immediate data has to be write in buffer, it doesn't work.
 
 START_ITOA:
-    ;MOVE.L   D6,(A5) ; This one has to be LONG instead of WORD but if I changed to LONG, it ITOA does not work
-    ; This issue has taken care at EA_EXTENDED
     CMP.B    #1,D0 ; check if the EA is MOVE
     BEQ      ITOA_MOVE
     CMP.B    #2,D0 ; check if the EA is MOVE
@@ -848,7 +846,7 @@ START_ITOA:
     BRA      ITOA
     
 ITOA:
-	MOVEM.L	    D0-D1, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
+	MOVEM.L	    D0/D1/D7, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
 	
 	CMP.B	    #%00, D2		    ; BYTE
 	BEQ	        ITOA_BYTE		
@@ -942,16 +940,17 @@ ITOA_CONVERT_A2F:
 	RTS
 
 ITOA_DONE:
-	MOVEM.L	    (SP)+, D0-D1 	    ; POP D1 (EA_TYPE)
+	MOVEM.L	    (SP)+, D0/D1/D7 	    ; POP D1 (EA_TYPE)
 	RTS
 
 ;----------------------------------------------------------
    
-ERROR:
+EA_ERROR:
     JMP     END
     
 FINISH_EA:
     ; testing address mode table jump
+    ADD.L   D4, D7 ; add displacement for next instruction read
     MOVE.B  #0,(A2)+
     LEA     buffer,A1
     MOVE.B  #13,D0
@@ -993,6 +992,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 *~Font name~Courier New~
 *~Font size~11~
