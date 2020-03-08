@@ -35,10 +35,10 @@ EA_START:
     
     LEA     buffer,A2
     MOVEA   #$500,A3 ; testing example start address
-    MOVE.W  #$60E6,(A3) ; load test example instruction If you want to test, change this value!
+    MOVE.L  #$48930809,(A3) ; load test example instruction If you want to test, change this value!
     MOVE.L  #$5678ABCD, 4(A3)
     MOVE.W  #$EF12, 8(A3)
-    MOVE.B  #7,D1 ; D1 for processing EA Type
+    MOVE.B  #5,D1 ; D1 for processing EA Type
     MOVE.B  D1,D0 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -191,13 +191,13 @@ EA_MOVEM:
     ADDI    #4, D4 ; insturction long displacement
     MOVE.W  (A3),D2 ; Size check
     JSR     EA_MOVEM_SIZE
-    MOVE.B  #15, D5 ; save masking bit place num
+    MOVE.L  #15, D5 ; save masking bit place num
     MOVE.W  (A3),D3 ;
-    BTST    #10,D3 ; check if reg to mem or mem to reg
     MOVE.L  #0, D6 ; counter for slash
-    BEQ     EA_MOVEM_REG_TO_MEM
+    BTST    #10,D3 ; check if reg to mem or mem to reg
+    BEQ     EA_MOVEM_REG_TO_MEM_CHOOSE
     MOVE.W  (A3), D1
-    ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
+    ANDI.W  #%0000000000111000,D1 ; mode 3 check (An)+ 
     ASR.W   #3,D1 ;
     CMP     #4,D1 ; checking invalid address mode
     BEQ     ERROR
@@ -207,31 +207,62 @@ EA_MOVEM:
     MOVE.W  #15, D5 ; save masking bit place num
     MOVE.L  #0, D6 ; counter for slash
     BRA     EA_MOVEM_MEM_TO_REG
-      
-EA_MOVEM_SIZE:
-    BTST    #6,D2
+      ; for predecrement mode -> reverse masking bit 
+EA_MOVEM_REG_TO_MEM_DEC:
+    MOVE.W  2(A3),D3 ; extracting masking bit
+    MOVE.L  D5, D1 ; temp
+    EORI.B  #%1111, D1 ; extracting reg num
+    ANDI.B  #%0111, D1 ; filter reg num
+    BTST    D5, D3    
+    BNE     EA_INSERT_REG_TO_MEM_DEC
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    BRA     EA_MOVEM_REG_TO_MEM_DEC
+
+EA_INSERT_REG_TO_MEM_DEC:
+    JSR     EA_INSERT_SLASH
+    MOVE.W  D1, D3 ; move the reg num from D1
+    MOVE.L  D5, D1
+    EORI.B  #%1000,D1
+    ASR.B   #3,D1
+    MULU    #6,D1
+    LEA     ADDRESS_MODE_TABLE, A0
+    JSR     0(A0, D1)
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    ADDI.B  #1, D6 ; counting for slash
+    BRA     EA_MOVEM_REG_TO_MEM_DEC
+    EA_MOVEM_SIZE:
+   BTST    #6,D2
     BEQ     INSERT_SIZE_W_TO_BUFFER
     BRA     INSERT_SIZE_L_TO_BUFFER
    
+EA_MOVEM_REG_TO_MEM_CHOOSE:
+    MOVE.W  (A3),D1 ; check if it predecrement mode
+    ANDI.W  #%0000000000111000, D1 ; check mode if mode 3 -(An)
+    ASR.L   #3,D1 
+    CMP     #4,D1
+    BEQ     EA_MOVEM_REG_TO_MEM_DEC
 ; use bit test to check the masking
 EA_MOVEM_REG_TO_MEM:
     MOVE.W  2(A3),D3 ; extracting masking bit
-    MOVE.B  D5, D1 ; temp
-    EORI.B  #%1111, D1 ; extracting reg num
+    MOVE.L  D5, D1 ; temp
+    EORI.B  #%0000, D1 ; extracting reg num
     ANDI.B  #%0111, D1 ; filter reg num
     BTST    D5, D3    
     BNE     EA_INSERT_REG_TO_MEM
     CMP     #0, D5 ; check if checking masking bit is finished
     BEQ     EA_MOVEM_FINISH
     SUBI.B  #1, D5 ; check next mask bit
-    ADDI.B  #1, D6 ; counting for slash
     BRA     EA_MOVEM_REG_TO_MEM
 
 EA_INSERT_REG_TO_MEM:
     JSR     EA_INSERT_SLASH
     MOVE.W  D1, D3 ; move the reg num from D1
-    MOVE.B  D5, D1
-    EORI.B  #%1000,D1
+    MOVE.L  D5, D1
+    EORI.B  #%0000,D1
     ASR.B   #3,D1
     MULU    #6,D1
     LEA     ADDRESS_MODE_TABLE, A0
@@ -253,7 +284,7 @@ PUT_SLASH:
 
 EA_MOVEM_MEM_TO_REG:
     MOVE.W  2(A3),D3 ; extracting masking bit
-    MOVE.B  D5, D1 ; temp
+    MOVE.L  D5, D1 ; temp
     EORI.B  #%0000, D1 ; extracting reg num
     ANDI.B  #%0111, D1 ; filter reg num
     BTST    D5, D3    
@@ -261,13 +292,12 @@ EA_MOVEM_MEM_TO_REG:
     CMP     #0, D5 ; check if checking masking bit is finished
     BEQ     FINISH_EA
     SUBI.B  #1, D5 ; check next mask bit
-    ADDI.B  #1, D6 ; counting for slash
     BRA     EA_MOVEM_MEM_TO_REG
       
 EA_INSERT_MEM_TO_REG:
     JSR     EA_INSERT_SLASH
-    MOVE.W  D1, D3 ; move the reg num from D1
-    MOVE.B  D5, D1
+    MOVE.L  D1, D3 ; move the reg num from D1
+    MOVE.L  D5, D1
     EORI.B  #%0000,D1
     ASR.B   #3,D1
     MULU    #6,D1
@@ -502,7 +532,7 @@ EA_IMMEDIATE:
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED ; to process immediate data
-    ;JSR     ITOA
+    JSR     ITOA
     ; generate dest EA address
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -945,6 +975,7 @@ buffer  DS.B    bufsize ; buffer
 *~Font size~11~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
