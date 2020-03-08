@@ -27,7 +27,7 @@ right4              EQU 4
 right8              EQU 8
 right16             EQU 16
 right24             EQU 24
-stack                                EQU $A0000
+stack               EQU $A0000
 SAMPLE_ADDR         EQU  $00000400
 
 
@@ -108,7 +108,7 @@ DECODE_LOOP:
     JSR     OP_START            ; OP_DECODE -> EA_CALC
         
     CMPA.L  END_ADDRESS, A3     ; if START_ADDRESS >= END_ADDRESS
-    BGE     END                 ;   END
+    BGE     END                 ;   END 
                                 ; else -> continue                           
     *------------------------------------------------------------------------
     
@@ -526,6 +526,7 @@ MEM_SHIFT:
     
     MOVE.L  D0, D4              ; get current instruction to D4
     ANDI.W  #5, D4              ;   bit 5
+    CMP.B   #1,  D4
     BEQ     DIR_RIGHT
                                 ; Else DIR_LEFT
 DIR_LEFT:                           
@@ -822,6 +823,7 @@ OP_LEA:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'E', (A2)+
     MOVE.B  #'A', (A2)+
+    MOVE.B  #' ', (A2)+
     ; Load immediate type
     MOVE.B  #3,D0
     JSR     EA_START
@@ -1071,6 +1073,7 @@ OP_MULU:
     MOVE.B  #'U', (A2)+
     MOVE.B  #'L', (A2)+
     MOVE.B  #'U', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #10,D0
     JSR     EA_START
     JMP OP_FINISH
@@ -1080,6 +1083,7 @@ OP_MULS:
     MOVE.B  #'U', (A2)+
     MOVE.B  #'L', (A2)+
     MOVE.B  #'S', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #10,D0
     JSR     EA_START
     JMP OP_FINISH
@@ -1116,7 +1120,9 @@ OP_ASL:
     MOVE.B  #'A', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'L', (A2)+
+    MOVE.B  #' ', (A2)+ 
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1124,7 +1130,9 @@ OP_ASR:
     MOVE.B  #'A', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1132,7 +1140,9 @@ OP_LSL:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'L', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1140,7 +1150,9 @@ OP_LSR:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1148,7 +1160,9 @@ OP_ROL:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'O', (A2)+
     MOVE.B  #'L', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1156,7 +1170,9 @@ OP_ROR:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'O', (A2)+
     MOVE.B  #'R', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
+    CLR     D4
     JSR     EA_START
     JMP     OP_FINISH
     
@@ -1164,12 +1180,26 @@ OP_ROR:
 OP_UNSUPPORTED:
     MOVE.L  #3, D1         ; Error Code #3
     JSR     ERROR_HANDLER
-    JMP     OP_FINISH
+    MOVE.B  #14, D0 
+    TRAP    #15 
+    CLR     D0             ;   For the ATOI
+    CLR     D1              
+    CLR      D2
+    CLR     D5  
+    CLR     (SP)           ; Clear the Stack Pointer
+    JMP     WELCOME
 
 OP_INVALID:
     MOVE.L  #4, D1          ; Error Code #4
     JSR     ERROR_HANDLER
-    JMP     OP_FINISH
+    MOVE.B  #14, D0 
+    TRAP    #15 
+    CLR     D0             ;   For the ATOI
+    CLR     D1              
+    CLR      D2  
+    CLR     D5             ; Clear the loop counter
+    CLR     (SP)           ; Clear the Stack Pointer
+    JMP     WELCOME
 *--------------------------------------------------------------------------    
 
 EA_START:
@@ -1308,7 +1338,7 @@ EA_MOVEQ:
     MOVE.W  (A3), D6 ; extract immediate data
     ANDI.W  #%0000000011111111, D6
     MOVE.W  D6, (A5) ; give this value to ITOA
-    CMP.B   #%00, D2
+    MOVE.B   #%00, D2
     MOVE.B  #'#', (A2)+
     MOVE.B  #'$', (A2)+
     JSR     ITOA
@@ -1326,47 +1356,78 @@ EA_MOVEM:
     ADDI    #4, D4 ; insturction long displacement
     MOVE.W  (A3),D2 ; Size check
     JSR     EA_MOVEM_SIZE
-    MOVE.B  #15, D5 ; save masking bit place num
+    MOVE.L  #15, D5 ; save masking bit place num
     MOVE.W  (A3),D3 ;
-    BTST    #10,D3 ; check if reg to mem or mem to reg
     MOVE.L  #0, D6 ; counter for slash
-    BEQ     EA_MOVEM_REG_TO_MEM
+    BTST    #10,D3 ; check if reg to mem or mem to reg
+    BEQ     EA_MOVEM_REG_TO_MEM_CHOOSE
     MOVE.W  (A3), D1
-    ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
+    ANDI.W  #%0000000000111000,D1 ; mode 3 check (An)+ 
     ASR.W   #3,D1 ;
     CMP     #4,D1 ; checking invalid address mode
-    BEQ     EA_ERROR
+    BEQ     ERROR
     JSR     EA_SRC_AS_DST
     MOVE.B  #',', (A2)+
     MOVE.B  #' ', (A2)+
     MOVE.W  #15, D5 ; save masking bit place num
     MOVE.L  #0, D6 ; counter for slash
     BRA     EA_MOVEM_MEM_TO_REG
-      
-EA_MOVEM_SIZE:
-    BTST    #6,D2
+      ; for predecrement mode -> reverse masking bit 
+EA_MOVEM_REG_TO_MEM_DEC:
+    MOVE.W  2(A3),D3 ; extracting masking bit
+    MOVE.L  D5, D1 ; temp
+    EORI.B  #%1111, D1 ; extracting reg num
+    ANDI.B  #%0111, D1 ; filter reg num
+    BTST    D5, D3    
+    BNE     EA_INSERT_REG_TO_MEM_DEC
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    BRA     EA_MOVEM_REG_TO_MEM_DEC
+
+EA_INSERT_REG_TO_MEM_DEC:
+    JSR     EA_INSERT_SLASH
+    MOVE.W  D1, D3 ; move the reg num from D1
+    MOVE.L  D5, D1
+    EORI.B  #%1000,D1
+    ASR.B   #3,D1
+    MULU    #6,D1
+    LEA     ADDRESS_MODE_TABLE, A0
+    JSR     0(A0, D1)
+    CMP     #0, D5 ; check if checking masking bit is finished
+    BEQ     EA_MOVEM_FINISH
+    SUBI.B  #1, D5 ; check next mask bit
+    ADDI.B  #1, D6 ; counting for slash
+    BRA     EA_MOVEM_REG_TO_MEM_DEC
+    EA_MOVEM_SIZE:
+   BTST    #6,D2
     BEQ     INSERT_SIZE_W_TO_BUFFER
     BRA     INSERT_SIZE_L_TO_BUFFER
    
+EA_MOVEM_REG_TO_MEM_CHOOSE:
+    MOVE.W  (A3),D1 ; check if it predecrement mode
+    ANDI.W  #%0000000000111000, D1 ; check mode if mode 3 -(An)
+    ASR.L   #3,D1 
+    CMP     #4,D1
+    BEQ     EA_MOVEM_REG_TO_MEM_DEC
 ; use bit test to check the masking
 EA_MOVEM_REG_TO_MEM:
     MOVE.W  2(A3),D3 ; extracting masking bit
-    MOVE.B  D5, D1 ; temp
-    EORI.B  #%1111, D1 ; extracting reg num
+    MOVE.L  D5, D1 ; temp
+    EORI.B  #%0000, D1 ; extracting reg num
     ANDI.B  #%0111, D1 ; filter reg num
     BTST    D5, D3    
     BNE     EA_INSERT_REG_TO_MEM
     CMP     #0, D5 ; check if checking masking bit is finished
     BEQ     EA_MOVEM_FINISH
     SUBI.B  #1, D5 ; check next mask bit
-    ADDI.B  #1, D6 ; counting for slash
     BRA     EA_MOVEM_REG_TO_MEM
 
 EA_INSERT_REG_TO_MEM:
     JSR     EA_INSERT_SLASH
     MOVE.W  D1, D3 ; move the reg num from D1
-    MOVE.B  D5, D1
-    EORI.B  #%1000,D1
+    MOVE.L  D5, D1
+    EORI.B  #%0000,D1
     ASR.B   #3,D1
     MULU    #6,D1
     LEA     ADDRESS_MODE_TABLE, A0
@@ -1388,7 +1449,7 @@ PUT_SLASH:
 
 EA_MOVEM_MEM_TO_REG:
     MOVE.W  2(A3),D3 ; extracting masking bit
-    MOVE.B  D5, D1 ; temp
+    MOVE.L  D5, D1 ; temp
     EORI.B  #%0000, D1 ; extracting reg num
     ANDI.B  #%0111, D1 ; filter reg num
     BTST    D5, D3    
@@ -1396,13 +1457,12 @@ EA_MOVEM_MEM_TO_REG:
     CMP     #0, D5 ; check if checking masking bit is finished
     BEQ     FINISH_EA
     SUBI.B  #1, D5 ; check next mask bit
-    ADDI.B  #1, D6 ; counting for slash
     BRA     EA_MOVEM_MEM_TO_REG
       
 EA_INSERT_MEM_TO_REG:
     JSR     EA_INSERT_SLASH
-    MOVE.W  D1, D3 ; move the reg num from D1
-    MOVE.B  D5, D1
+    MOVE.L  D1, D3 ; move the reg num from D1
+    MOVE.L  D5, D1
     EORI.B  #%0000,D1
     ASR.B   #3,D1
     MULU    #6,D1
@@ -1421,7 +1481,7 @@ EA_MOVEM_FINISH:
     ANDI.W  #%000000000111000,D1 ; mode 3 check (An)+ 
     ASR.W   #3,D1 ;
     CMP     #3,D1 ; checking invalid address mode
-    BEQ     EA_ERROR
+    BEQ     ERROR
     JSR     EA_SRC_AS_DST
     JMP     FINISH_EA
     
@@ -1986,7 +2046,7 @@ ITOA:
 	JMP	        ITOA_LONGADDR		; LONG ADDRESS
 
 ITOA_MOVE:
-	MOVEM.L	    D0/D1, -(SP)		; push EA_**** (EA_TYPE)
+	MOVEM.L	    D0/D1/D7, -(SP)		; push EA_**** (EA_TYPE)
 	
 	CMP.B	    #%01, D2		    ; BYTE
 	BEQ	        ITOA_BYTE		
@@ -2154,14 +2214,14 @@ ERROR_7:
 *--------------------------------------------------------------------------    
 
 
-errorMsg_0      DC.B            'Invalid start address', $0
-errorMsg_1      DC.B            'Invalid end address', $0
-errorMsg_2      DC.B            'Invalid address range', $0
-errorMsg_3      DC.B            'OP CODE NOT SUPPORTED', $0
-errorMsg_4      DC.B            'INVALID OP CODE', $0
-errorMsg_5      DC.B            'WRONG SIZE', $0
-errorMsg_6      DC.B            'WRONG EA MODE/REGISTER', $0
-errorMsg_7      DC.B            'UNKNOWN ERROR', $0
+errorMsg_0      DC.B            'Invalid start address', CR,LF,$0
+errorMsg_1      DC.B            'Invalid end address', CR,LF,$0
+errorMsg_2      DC.B            'Invalid address range', CR,LF,$0
+errorMsg_3      DC.B            'OP CODE NOT SUPPORTED', CR,LF,$0
+errorMsg_4      DC.B            'INVALID OP CODE', CR,LF,$0
+errorMsg_5      DC.B            'WRONG SIZE', CR,LF,$0
+errorMsg_6      DC.B            'WRONG EA MODE/REGISTER', CR,LF,$0
+errorMsg_7      DC.B            'UNKNOWN ERROR', CR,LF,$0
 
 test_0000       DC.B            'code 0000', $0 
 test_0001       DC.B            'code 0001', $0 
