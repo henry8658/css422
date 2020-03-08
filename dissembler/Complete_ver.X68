@@ -90,7 +90,8 @@ CHECK_ADDRESS:
     MOVEA.L START_ADDRESS,A3    ;  *Loads the address saved in side of the START_ADDRESS @@@@@@@@@@@
                                 ;  *Then A3 will be pointing at Starting Address @@@@@@@@@@@@@@@@
                                 ;   @@ Needs to upload the address A3, before going into the Decode_Loop
-    CLR     D4 ; TESTING@@@@
+
+    MOVE.L  A3, D7              ; LOAD THE CURRENT INSTRUCTION BEFORE THE LOOP BEGINS   
     BRA     DECODE_LOOP ; go to decode loop to process 
     
 *----------------------------------------------------------------------------   
@@ -105,15 +106,10 @@ DECODE_LOOP:
     ; Decode starts here  OP_DECODE -> EA_CALC  
                        
     JSR     OP_START            ; OP_DECODE -> EA_CALC
-    
-    ;MOVE.B  #$2,D4      ; Temporary Counter@@@@@@@@Must be deleted when EA_Calc gets together
-    ;ADD.L   D4, A3              ; will be updated in the EA_calc
-    CLR     D3
         
     CMPA.L  END_ADDRESS, A3     ; if START_ADDRESS >= END_ADDRESS
     BGE     END                 ;   END
-                                ; else -> continue
-                                
+                                ; else -> continue                           
     *------------------------------------------------------------------------
     
     SUBI    #1, D5      ;   D--;
@@ -246,7 +242,7 @@ OP_START:
     MOVE.L      A3, D7
     MOVE.L      D7, (A5)
     JSR         ITOA            ;  A5 converts into ascii
-    CLR          D7
+
      
     MOVE.B      #' ', (A2)+      ;  address' ' 
     
@@ -364,9 +360,7 @@ code0101:
 code0110:
     ;   BRA.bw   / BSR.bw    /Bcc.bw
     
-    MOVE.B  #'B', (A2)+         ;Bcc
-    MOVE.L  #ea_bcc_flag,   D5  ; the flag in ea_type_branch
-    
+    MOVE.B  #'B', (A2)+         ;Bcc   
     MOVE.L  D0, D1              ; D1 = D0 (cur instruction word)
     ANDI.W  #$0F00, D1          ; get 2nd nibble in to D1     
     MOVE.B  #8, D2              ; D2 Shift Counter = 8
@@ -376,12 +370,7 @@ code0110:
     JMP     0(A0,D1)            ; jump to designated OP CODE
     
 code0111:
-    ;   MOVEQ   
-    
-    MOVE.B  #13, D0             ;task#13
-    LEA     test_0111, A1
-    TRAP    #15
-    
+    ;   MOVEQ     
     JMP     OP_MOVEQ            ;0111 only indicates MOVEQ
     
 code1000:
@@ -764,6 +753,7 @@ OP_JSR:
     MOVE.B  #'J', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #13,D0
     JSR     EA_START    
     JMP     OP_FINISH
@@ -772,6 +762,7 @@ OP_JMP:
     MOVE.B  #'J', (A2)+
     MOVE.B  #'M', (A2)+
     MOVE.B  #'P', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #13,D0
     JSR     EA_START
     JMP     OP_FINISH    
@@ -795,12 +786,16 @@ OP_NOP:
     MOVE.B  #'O', (A2)+
     MOVE.B  #'P', (A2)+
     ;Need additional line to move to the next Word
+    ADDI    #2, D4  
+    JSR     FINISH_EA   
     JMP     OP_FINISH
       
 OP_RTS:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'T', (A2)+
     MOVE.B  #'S', (A2)+
+    ADDI    #2, D4  
+    JSR     FINISH_EA
     JMP     OP_FINISH
     
 OP_EXT_MOVEM:
@@ -865,15 +860,12 @@ OP_SUBQ:
     JMP     OP_FINISH
        
 *---- 0110 ------------------------------------------------------------------
-ea_bcc_flag:
-    ;   NEED Bcc calculation
-    ;   Find the pattern,
-    ;   CMP and let it jump to designated OP CODE
+
 
 OP_RA:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'A', (A2)+
-    JMP OP_FINISH
+    MOVE.B  #' ', (A2)+ 
         ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -882,6 +874,7 @@ OP_RA:
 OP_SR:
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
+    MOVE.B  #' ', (A2)+ 
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -890,6 +883,7 @@ OP_SR:
 OP_HI:
     MOVE.B  #'H',   (A2)+
     MOVE.B  #'I',   (A2)+
+    MOVE.B  #' ', (A2)+
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -898,6 +892,7 @@ OP_HI:
 OP_LS:
     MOVE.B  #'L',   (A2)+
     MOVE.B  #'S',   (A2)+  
+    MOVE.B  #' ', (A2)+
         ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -906,6 +901,7 @@ OP_LS:
 OP_CC:
     MOVE.B  #'C', (A2)+
     MOVE.B  #'C', (A2)+
+    MOVE.B  #' ', (A2)+
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -913,7 +909,8 @@ OP_CC:
     
 OP_CS:
     MOVE.B  #'C',   (A2)+
-    MOVE.B  #'S',   (A2)+  
+    MOVE.B  #'S',   (A2)+ 
+    MOVE.B  #' ', (A2)+ 
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -921,7 +918,8 @@ OP_CS:
     
 OP_NE:
     MOVE.B  #'N',   (A2)+
-    MOVE.B  #'E',   (A2)+  
+    MOVE.B  #'E',   (A2)+
+    MOVE.B  #' ', (A2)+  
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -929,7 +927,8 @@ OP_NE:
     
 OP_EQ:
     MOVE.B  #'E',   (A2)+
-    MOVE.B  #'Q',   (A2)+     
+    MOVE.B  #'Q',   (A2)+
+    MOVE.B  #' ', (A2)+     
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -937,7 +936,8 @@ OP_EQ:
  
 OP_VC:
     MOVE.B  #'V',   (A2)+
-    MOVE.B  #'C',   (A2)+  
+    MOVE.B  #'C',   (A2)+
+    MOVE.B  #' ', (A2)+  
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -945,7 +945,8 @@ OP_VC:
     
 OP_VS:
     MOVE.B  #'V',   (A2)+
-    MOVE.B  #'S',   (A2)+    
+    MOVE.B  #'S',   (A2)+
+    MOVE.B  #' ', (A2)+    
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -953,7 +954,8 @@ OP_VS:
     
 OP_PL:
     MOVE.B  #'P',   (A2)+
-    MOVE.B  #'L',   (A2)+   
+    MOVE.B  #'L',   (A2)+ 
+    MOVE.B  #' ', (A2)+  
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -961,7 +963,8 @@ OP_PL:
     
 OP_MI:
     MOVE.B      #'M',   (A2)+   
-    MOVE.B      #'I',   (A2)+       
+    MOVE.B      #'I',   (A2)+
+    MOVE.B  #' ', (A2)+       
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -969,7 +972,8 @@ OP_MI:
     
 OP_GE:
     MOVE.B  #'G',   (A2)+
-    MOVE.B  #'E',   (A2)+  
+    MOVE.B  #'E',   (A2)+ 
+    MOVE.B  #' ', (A2)+ 
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -977,7 +981,8 @@ OP_GE:
     
 OP_LT:
     MOVE.B  #'L',   (A2)+
-    MOVE.B  #'T',   (A2)+      
+    MOVE.B  #'T',   (A2)+ 
+    MOVE.B  #' ', (A2)+     
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -985,7 +990,8 @@ OP_LT:
     
 OP_GT:
     MOVE.B  #'G',   (A2)+
-    MOVE.B  #'T',   (A2)+  
+    MOVE.B  #'T',   (A2)+
+    MOVE.B  #' ', (A2)+  
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -993,7 +999,8 @@ OP_GT:
     
 OP_LE:
     MOVE.B  #'L',   (A2)+
-    MOVE.B  #'E',   (A2)+  
+    MOVE.B  #'E',   (A2)+ 
+    MOVE.B  #' ', (A2)+ 
     ; Load immediate type
     MOVE.B  #7,D0
     JSR     EA_START
@@ -1006,6 +1013,7 @@ OP_MOVEQ:
     MOVE.B  #'V', (A2)+
     MOVE.B  #'E', (A2)+
     MOVE.B  #'Q', (A2)+
+    MOVE.B  #' ', (A2)+ 
     MOVE.B  #11,D0
     JSR     EA_START
     JMP OP_FINISH
@@ -1017,6 +1025,8 @@ OP_DIVU:
     MOVE.B  #'I', (A2)+
     MOVE.B  #'V', (A2)+
     MOVE.B  #'U', (A2)+
+    MOVE.B  #' ', (A2)+
+    
     MOVE.B  #10,D0
     JSR     EA_START
     JMP OP_FINISH
@@ -1025,6 +1035,7 @@ OP_DIVS:
     MOVE.B  #'I', (A2)+
     MOVE.B  #'V', (A2)+
     MOVE.B  #'S', (A2)+
+    MOVE.B  #' ', (A2)+
     MOVE.B  #10,D0
     JSR     EA_START
     JMP OP_FINISH
@@ -1162,7 +1173,7 @@ OP_INVALID:
 *--------------------------------------------------------------------------    
 
 EA_START:
-; push some data here for Op calculation ex) D3: loop counter
+; push some data here for Op calculation ex) D3: loop counter 
     MOVE.B  D0,D1 ; save EA TYPE in D0
     LEA     EA_TYPE_TABLE,A0
     MULU    #6,D1
@@ -1189,8 +1200,8 @@ EA_JJ:
     ANDI.W  #%0000000000111000,D1   ; get mode
     LSR.W   #$3, D1
     
-    MOVE.W  (A3), D3                  ; Move instruction to D3 for reg
-    ANDI.W  #%0000000000000111,D3   ; get reg
+    MOVE.W  (A3), D2                  ; Move instruction to D3 for reg
+    ANDI.W  #%0000000000000111,D2   ; get reg
     
     CMP.B   #7, D1                  ; if src mode == 010 || 111
     BEQ     EA_JJ_111
@@ -1229,6 +1240,7 @@ JJ_000:
     JMP     FINISH_EA
 
 EA_CLR:
+    ADDI    #2, D4          ;  To read extended address
     MOVE.W  (A3), D2                
     ANDI.W  #%0000000011000000,D2   ; Extract EA size
     LSR.W   #6, D2
@@ -1255,7 +1267,6 @@ EA_CLR_111:
     CLR     D2              ; In case (CLR.B $12341234)
     MOVE.B  #' ', (A2)+
     MOVE.B  #'$', (A2)+     ; Absolute Value
-    ADDI    #2, D4          ;  To read extended address
     CMP.B   #0, D3          ;IF ABSOLUTE SIZE 0
     BEQ     CLR_000          ;   SKIP ABSOLUTE SIZE ++ 
     CMP.B   #2, D3  
@@ -1594,8 +1605,8 @@ EA_QUICK_DATA:
 EA_BRANCH:
     ADDI    #2,D4
     MOVE.B  #'$',(A2)+
-    MOVE.W  (A3), D3      ;   NEED TO CHECK [ANDI.W #$00FF]
-    ANDI.W  #$FF, D3  ;   If 00 || FF 
+    MOVE.W  (A3), D3    ;   NEED TO CHECK [ANDI.W #$00FF]
+    ANDI.W  #$FF, D3    ;   If 00 || FF 
     CMP.B   #$FF, D3    ; 
     BEQ     Bcc_Extend  ;       FF = Long
     CMP.B   #$00, D3    
@@ -1624,12 +1635,14 @@ EA_BRANCH:
     
     ; D2 = size 
     MOVE.W  #$3, D2     ; Update Size for ITOA
-    ADDI.W  #2, D4      ; TO UPDATE START ADDRESs, after converting 
     JSR     START_ITOA
       
     JMP     FINISH_EA
    
 Bcc_Extend:    
+    MOVE.W  (A3), D2        ;   GET DATA SIZE
+    ANDI.W  #%0000000000000111,D2   
+    
     JSR     EA_Bcc_EXTENDED ; displacement calc done
     
     MOVE.W  (A5),D3 ; Copy negative displacement
@@ -1659,7 +1672,7 @@ EA_IMMEDIATE:
     MOVE.B  #'#',(A2)+
     MOVE.B  #'$',(A2)+
     JSR     EA_EXTENDED ; to process immediate data
-    ;JSR     ITOA
+    JSR     ITOA
     ; generate dest EA address
     MOVE.B  #',',(A2)+
     MOVE.B  #' ',(A2)+
@@ -1973,7 +1986,7 @@ ITOA:
 	JMP	        ITOA_LONGADDR		; LONG ADDRESS
 
 ITOA_MOVE:
-	MOVEM.L	    D0-D1, -(SP)		; push EA_**** (EA_TYPE)
+	MOVEM.L	    D0/D1, -(SP)		; push EA_**** (EA_TYPE)
 	
 	CMP.B	    #%01, D2		    ; BYTE
 	BEQ	        ITOA_BYTE		
@@ -2066,7 +2079,8 @@ EA_ERROR:
     
 FINISH_EA:
     ; testing address mode table jump
-    ADD.L   D4, A3 ; add displacement for next instruction read
+    ADD.L   D4, D7      ; add displacement for next instruction read 
+    MOVE.L  D7, A3          
     CLR     D4
     MOVE.B  #0,(A2)+
     LEA     buffer,A1
@@ -2199,6 +2213,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 *~Font name~Courier New~
 *~Font size~10~
 *~Tab type~1~
