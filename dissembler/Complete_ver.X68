@@ -525,8 +525,9 @@ MEM_SHIFT:
     MULU    #6, D1                  
     
     MOVE.L  D0, D4              ; get current instruction to D4
-    ANDI.W  #5, D4              ;   bit 5
-    CMP.B   #1,  D4
+    ANDI.W  #%0000000100000000, D4  ; get direction
+    LSR.W   #8, D4
+    CMP.B   #0, D4
     BEQ     DIR_RIGHT
                                 ; Else DIR_LEFT
 DIR_LEFT:                           
@@ -547,7 +548,7 @@ REG_SHIFT:
     MOVE.L  D0, D4              ;  get current instruction into D4
     ANDI.W  #%0000000100000000, D4  ; get direction
     LSR.W   #8, D4
-    CMP.B   #1,  D4
+    CMP.B   #1, D4
     BEQ     DIR_LEFT
     JMP     DIR_RIGHT
 
@@ -564,7 +565,7 @@ code1111:
 *----------------------------------------------------------------------------   
 OP_0000_TABLE:
     JMP     OP_ORI              ; 0: ORI
-    JMP     OP_UNSUPPORTED      ; 1: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
+    JMP     OP_ANDI      ; 1: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
     JMP     OP_UNSUPPORTED     ; 2: ANDI
     JMP     OP_UNSUPPORTED      ; 3: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
     JMP     OP_SUBI             ; 4: SUBI
@@ -2273,6 +2274,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 *~Font name~Courier New~
 *~Font size~10~
