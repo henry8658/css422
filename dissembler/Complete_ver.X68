@@ -1319,8 +1319,9 @@ EA_ADDA:
     MOVE.B  #' ',(A2)+
     MOVE.B  #'A',(A2)+
     MOVE.W  (A3),D3
-    ANDI.W  #%0000000111000000,D3
-    ASR.W   #6,D3
+    ANDI.W  #%0000111000000000,D3
+    MOVE.B  #9,D5
+    ASR.W   D5,D3
     JSR     INSERT_REG_NUM
     JMP     FINISH_EA
     
@@ -2274,6 +2275,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
