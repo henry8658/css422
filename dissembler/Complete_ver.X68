@@ -99,7 +99,7 @@ CHECK_ADDRESS:
 *   D4 = How many bytes to JUMP
 *----------------------------------------------------------------------------   
 DECODE_LOOP:
-     ADDI.W  #1, D5 ; Loop Counter = 23 TIMES 
+     ADDI.W  #23, D5 ; Loop Counter = 23 TIMES 
         
     LOOP: 
     *------------------------------------------------------------------------    
@@ -108,7 +108,7 @@ DECODE_LOOP:
     JSR     OP_START            ; OP_DECODE -> EA_CALC
         
     CMPA.L  END_ADDRESS, A3     ; if START_ADDRESS >= END_ADDRESS
-    BGE     END                 ;   END 
+    BGT     END                 ;   END 
                                 ; else -> continue                           
     *------------------------------------------------------------------------
     
@@ -565,8 +565,8 @@ code1111:
 *----------------------------------------------------------------------------   
 OP_0000_TABLE:
     JMP     OP_ORI              ; 0: ORI
-    JMP     OP_ANDI      ; 1: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
-    JMP     OP_UNSUPPORTED     ; 2: ANDI
+    JMP     OP_UNSUPPORTED     ; 1: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
+    JMP     OP_ANDI             ; 2: ANDI
     JMP     OP_UNSUPPORTED      ; 3: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
     JMP     OP_SUBI             ; 4: SUBI
     JMP     OP_UNSUPPORTED      ; 5: not supported for BTST, BCHG, BCLR, BSET, MOVEP with Dn
@@ -2274,6 +2274,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 *~Font name~Courier New~
