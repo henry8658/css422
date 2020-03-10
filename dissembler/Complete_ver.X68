@@ -1,12 +1,12 @@
 *-----------------------------------------------------------
-* Title      :
-* Written by :
-* Date       :
-* Description:
+* Title      : disassembler.X68
+* Written by : Tae Kwon & Henry Park
+* Date       : 03/10/2020
+* Description: Disassembler for 68k assembly language
 *-----------------------------------------------------------
-START_ADDRESS       EQU $300 ; start address
-END_ADDRESS         EQU $308 ; end address
-INPUT_VALUE         EQU $316 ; user input value
+START_ADDRESS       EQU $100 ; start address
+END_ADDRESS         EQU $108 ; end address
+INPUT_VALUE         EQU $116 ; user input value
 CR                  EQU $0D ; Carrige return
 LF                  EQU $0A ; Linefeed
 nibble2             EQU $0F00
@@ -1778,6 +1778,7 @@ EA_SHIFT:
     BRA     EA_SHIFT_TWO_OPERAND
     
 EA_SHIFT_ONE_OPERAND:
+    MOVE.B  #' ',(A2)+
     MOVE.W  (A3), D2 ; Check if it has invalid address mode Dn
     ANDI.W  #%0000000000111000,D2
     LSR.W   #3,D2
@@ -2248,7 +2249,8 @@ ERROR_7:
 *--------------------------------------------------------------------------        
 * Variables
 *--------------------------------------------------------------------------    
-
+buffer          DS.B    bufsize ; buffer 
+ITOA_BUFFER     DS.B    itoa_buffersize ; itoa buffer
 
 errorMsg_0      DC.B            'Invalid start address', CR,LF,$0
 errorMsg_1      DC.B            'Invalid end address', CR,LF,$0
@@ -2281,21 +2283,18 @@ INPUT_END     DC.B    'Enter end address: ',CR,LF,0
 CONFIRM_MSG   DC.B    'Would you like to continue, type y for yes / type n for no', CR,LF,0
 CONFIRM_MSG2  DC.B    'Would you like to disassemble another memory image?', CR,LF,0
 CONFIRM_MSG3  DC.B    '(type y for yes / type n for no)', CR,LF,0
-END_MSG       DC.B    'Thank you for using 68K Disassembler, Have a good day', CR,LF,0
+END_MSG       DC.B    'Thank you for using 68K Disassembler, Have a good day.', CR,LF,0
 WARNING_MSG   DC.B    'Wrong Input, Please Type Again', CR,LF,0
 ERROR_INPUT   DC.B    'Please check your input!',CR,LF,0
 RESULT        DC.B    'Completed: ',CR,LF,0 
 WELCOME_MSG   DC.B    'Welcome!',CR,LF,0
 
-buffer  DS.B    bufsize ; buffer 
-ITOA_BUFFER     DS.B      itoa_buffersize ; itoa buffer
 
 EXIT:  
 END: 
     LEA     END_MSG,A1 ; Get user's input
     MOVE.B  #14,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
     TRAP    #15 ; excute trap
-
     SIMHALT             ; halt simulator
     END    START        ; last line of source
 
@@ -2308,6 +2307,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
