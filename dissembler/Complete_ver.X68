@@ -21,6 +21,7 @@ srcmode_low2        EQU %0000000000011000 ; source mode lower 2 bits
 dstreg              EQU $0E00 ; dest regs
 srcreg              EQU $0007 ; src regs
 bufsize             EQU 64 ; 64 characters can be stored in buffer
+itoa_buffersize     EQU 10 ; buffer for Itoa
 right3              EQU 3
 right4              EQU 4
 right8              EQU 8
@@ -43,8 +44,9 @@ USER_INPUT:
     CLR.L   END_ADDRESS ; clean end address
     CLR.L   INPUT_VALUE ; clean user input
     CLR.L   D0 ; clean
-    CLR.W   D3 ; clean flag for end address
-    ;MOVEA.L #0,A1 ; clear A1
+    CLR.L   D3 ; clean flag for end address
+    CLR.L   D2 ; clean D2
+    MOVEA.L #0,A1 ; clear A1
     LEA     INPUT_START,A1 ; load message on A1
     MOVE.B  #14,D0 ; read char at A1 until null
     TRAP    #15 ; excute command code at D0
@@ -231,7 +233,7 @@ OP_START:
     ; clear decoded_buf
     JSR         OP_DATA_CLR
     LEA         buffer, A2 ;  A2 will be pointing to decoded_buf (completely cleared)
-    
+    LEA         ITOA_BUFFER,  A5
     ; print the address
     MOVE.L      #$0003, D2      ;  D2 = data size (011 = long address)
     MOVE.L      A3, D7
@@ -2033,7 +2035,7 @@ START_ITOA:
     
 ITOA:
 	MOVEM.L	    D0/D1/D7, -(SP)		; push EA_****	funtion's D1 (EA_TYPE)
-	
+	    LEA     ITOA_BUFFER,  A5
 	CMP.B	    #%00, D2		    ; BYTE
 	BEQ	        ITOA_BYTE		
 	CMP.B	    #%01, D2		    ; WORD
@@ -2044,7 +2046,7 @@ ITOA:
 
 ITOA_MOVE:
 	MOVEM.L	    D0/D1/D7, -(SP)		; push EA_**** (EA_TYPE)
-	
+	    LEA     ITOA_BUFFER,  A5
 	CMP.B	    #%01, D2		    ; BYTE
 	BEQ	        ITOA_BYTE		
 	CMP.B	    #%11, D2		    ; WORD
@@ -2126,8 +2128,21 @@ ITOA_CONVERT_A2F:
 	RTS
 
 ITOA_DONE:
+    JSR     ITOA_BUFFER_CLR
+    LEA     ITOA_BUFFER,  A5
 	MOVEM.L	    (SP)+, D0/D1/D7 	    ; POP D1 (EA_TYPE)
 	RTS
+
+ITOA_BUFFER_CLR:
+    CLR.L   D0
+    MOVE.B  #itoa_buffersize, D0
+    LEA     ITOA_BUFFER, A5
+    
+ITOA_BUFFER_CLR_LOOP:
+    MOVE.B  #0, (A5)+
+    SUBI    #1, D0
+    BGT     ITOA_BUFFER_CLR_LOOP
+    RTS
 
 ;----------------------------------------------------------
    
@@ -2247,6 +2262,7 @@ RESULT        DC.B    'Completed: ',CR,LF,0
 WELCOME_MSG   DC.B    'Welcome!',CR,LF,0
 
 buffer  DS.B    bufsize ; buffer 
+ITOA_BUFFER     DS.B      itoa_buffersize ; itoa buffer
 
 EXIT:  
 END: 
@@ -2271,6 +2287,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
