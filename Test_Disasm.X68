@@ -28,6 +28,92 @@ START:
 * 1110: ASL, ASR, LSL, LSR, ROL, and ROR
 *
 
+    LEA       $300, A1
+    LEA       ($1234).L, A2
+    LEA       $F, A3
+    LEA       $1234,A4 
+    LEA       $5555,A5
+    LEA       $F001,A6
+    LEA       $F001,A7
+    
+    CLR.B     D1
+    CLR.B     D2
+    CLR.B     D3
+    CLR.B     D4
+    CLR.B     D5
+    CLR.B     D7
+    CLR.W     D1
+    CLR.W     D2
+    CLR.W     D3
+    CLR.W     D4
+    CLR.W     D5
+    CLR.W     D7
+    CLR.L     D1
+    CLR.L     D2
+    CLR.L     D3
+    CLR.L     D4
+    CLR.L     D5
+    CLR.L     D7
+    
+    
+    CLR.B     (A1)
+    CLR.B     (A2)
+    CLR.B     (A3)
+    CLR.B     (A4)
+    CLR.B     (A5)
+    CLR.B     (A6)
+    CLR.W     (A7)
+    CLR.W     (A1)
+    CLR.W     (A2)
+    CLR.W     (A3)
+    CLR.W     (A4)
+    CLR.W     (A5)
+    CLR.W     (A6)
+    CLR.W     (A7)
+    CLR.L     (A1)
+    CLR.L     (A2)
+    CLR.L     (A3)
+    CLR.L     (A4)
+    CLR.L     (A5)
+    CLR.L     (A6)
+    CLR.L     (A7)
+    
+    
+      ORI       #1, $1234     
+      ORI       #13, $12341234
+      ORI       #$FFFF, $FFFFFFFF
+      ORI       #$F, ($0000).L  
+      ORI       #$00001111, ($0000).L
+      
+      ANDI       #1, $1234     
+      ANDI       #13, $12341234
+      ANDI       #$FFFF, $FFFFFFFF
+      ANDI       #$F, ($0000).L  
+      ANDI       #$00001111, ($0000).L
+      
+      SUBI       #1, ($00001234)    
+      SUBI       #13, $12341234
+      SUBI       #$FFFF, $FFFFFFFF
+      SUBI       #$F, ($0000).L  
+      SUBI       #$00001111, ($0000).L
+      
+      EORI       #1, $1234     
+      EORI       #13, $12341234
+      EORI       #$FFFF, $FFFFFFFF
+      EORI       #$F, ($0000).L  
+      EORI       #$00001111, ($0000).L
+      
+      CMPI       #1, $1234     
+      CMPI       #13, $12341234
+      CMPI       #$FFFF, $FFFFFFFF
+      CMPI       #$F, ($0000).L  
+      CMPI       #$00001111, ($0000).L
+
+  
+      ASL	    $ABCD         ; mode 7 subclass 0 
+      MOVE.L	D4, ($ABCDEF12).L ; mode 7 subclass 1
+      ASR	    ($ABCDEF12).L	  ; mode 7 subclass 1
+      MOVE.L	#$12345678, D5	  ; mode 7 subclass 4
       SUBI.W	#$ABCD, D0
       ADDI.W	#$ABCD, D1
       MOVEA.W	D2, A3
@@ -149,6 +235,7 @@ START:
       BLE	    $600
 
       END   START
+
 
 
 

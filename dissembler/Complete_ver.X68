@@ -2279,7 +2279,7 @@ test_1111       DC.B            'code 1111', $0
 INPUT_START   DC.B    'Enter start address: ',CR,LF,0
 INPUT_END     DC.B    'Enter end address: ',CR,LF,0
 CONFIRM_MSG   DC.B    'Would you like to continue, type y for yes / type n for no', CR,LF,0
-CONFIRM_MSG2  DC.B    'Decoding reached the End Address, Would like to decode more?', CR,LF,0
+CONFIRM_MSG2  DC.B    'Would you like to disassemble another memory image?', CR,LF,0
 CONFIRM_MSG3  DC.B    '(type y for yes / type n for no)', CR,LF,0
 END_MSG       DC.B    'Thank you for using 68K Disassembler, Have a good day', CR,LF,0
 WARNING_MSG   DC.B    'Wrong Input, Please Type Again', CR,LF,0
