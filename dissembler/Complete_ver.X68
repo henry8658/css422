@@ -112,7 +112,7 @@ DECODE_LOOP:
     JSR     OP_START            ; OP_DECODE -> EA_CALC
         
     CMPA.L  END_ADDRESS, A3     ; if START_ADDRESS >= END_ADDRESS
-    BGT     END                 ;   END 
+    BGT     END_CONFIRM                 ;   END 
                                 ; else -> continue                           
     *------------------------------------------------------------------------
     
@@ -129,11 +129,9 @@ REPEAT_OR_FINISH:
     MOVE.B  #14,D0 ; read char at A1 until null
     TRAP    #15 ; excute command code at D0 
     
-    
     LEA     INPUT_VALUE,A1 ; Get user's input
     MOVE.B  #2,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
     TRAP    #15 ; excute trap
-    
     
     ; Compare by ascii
     MOVEA   INPUT_VALUE, A1
@@ -161,6 +159,45 @@ REPEAT_OR_FINISH:
     No:
     JMP END 
 
+END_CONFIRM:
+    ; "Would you like to continue, type y for yes / type n for no"
+    LEA     CONFIRM_MSG2,A1 ; load message on A1
+    MOVE.B  #14,D0 ; read char at A1 until null
+    TRAP    #15 ; excute command code at D0 
+    
+    LEA     CONFIRM_MSG3,A1 ; load message on A1
+    MOVE.B  #14,D0 ; read char at A1 until null
+    TRAP    #15 ; excute command code at D0
+    
+    LEA     INPUT_VALUE,A1 ; Get user's input
+    MOVE.B  #2,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
+    TRAP    #15 ; excute trap
+    
+    ; Compare by ascii
+    MOVEA   INPUT_VALUE, A1
+    CMPA    #$7900, A1        ; if y($79) Y($59) -> JMP Yes
+    BEQ     Yes2
+    CMPA    #$5900, A1 
+    BEQ     Yes2
+    CMPA    #$4E00, A1        ; else if n($6E) N($4E) -> JMP No
+    BEQ     No2
+    CMPA    #$6E00, A1
+    BEQ     No2
+    
+    ;  else it is wrong input
+    CLR.L   INPUT_VALUE
+    
+    LEA     WARNING_MSG,A1 ; load message on A1
+    MOVE.B  #14,D0 ; read char at A1 until null
+    TRAP    #15 ; excute command code at D0;  
+    JMP     END_CONFIRM
+    
+    Yes2:
+    JMP     WELCOME
+      
+    No2:
+    JMP END
+ 
 ; TODO: convert int to HEX . Or user will input hex value? In second case, we need to develop a converter that does char to hex
 ATOI:
     CMP     #0,D1 ; check if there is char to process D1: length of string
@@ -2242,6 +2279,9 @@ test_1111       DC.B            'code 1111', $0
 INPUT_START   DC.B    'Enter start address: ',CR,LF,0
 INPUT_END     DC.B    'Enter end address: ',CR,LF,0
 CONFIRM_MSG   DC.B    'Would you like to continue, type y for yes / type n for no', CR,LF,0
+CONFIRM_MSG2  DC.B    'Decoding reached the End Address, Would like to decode more?', CR,LF,0
+CONFIRM_MSG3  DC.B    '(type y for yes / type n for no)', CR,LF,0
+END_MSG       DC.B    'Thank you for using 68K Disassembler, Have a good day', CR,LF,0
 WARNING_MSG   DC.B    'Wrong Input, Please Type Again', CR,LF,0
 ERROR_INPUT   DC.B    'Please check your input!',CR,LF,0
 RESULT        DC.B    'Completed: ',CR,LF,0 
@@ -2252,17 +2292,12 @@ ITOA_BUFFER     DS.B      itoa_buffersize ; itoa buffer
 
 EXIT:  
 END: 
+    LEA     END_MSG,A1 ; Get user's input
+    MOVE.B  #14,D0 ; Read string from keyboard and store at (A1), NULL terminated, length retuned in D1.W (max 80)
+    TRAP    #15 ; excute trap
+
     SIMHALT             ; halt simulator
     END    START        ; last line of source
-
-
-
-
-
-
-
-
-
 
 *~Font name~Courier New~
 *~Font size~10~
