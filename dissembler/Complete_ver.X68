@@ -1125,7 +1125,6 @@ OP_ASL:
     MOVE.B  #'A', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'L', (A2)+
-    MOVE.B  #' ', (A2)+ 
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1135,7 +1134,6 @@ OP_ASR:
     MOVE.B  #'A', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
-    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1145,7 +1143,6 @@ OP_LSL:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'L', (A2)+
-    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1155,7 +1152,6 @@ OP_LSR:
     MOVE.B  #'L', (A2)+
     MOVE.B  #'S', (A2)+
     MOVE.B  #'R', (A2)+
-    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1165,7 +1161,6 @@ OP_ROL:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'O', (A2)+
     MOVE.B  #'L', (A2)+
-    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1175,7 +1170,6 @@ OP_ROR:
     MOVE.B  #'R', (A2)+
     MOVE.B  #'O', (A2)+
     MOVE.B  #'R', (A2)+
-    MOVE.B  #' ', (A2)+
     MOVE.B  #8,D0
     CLR     D4
     JSR     EA_START
@@ -1185,26 +1179,11 @@ OP_ROR:
 OP_UNSUPPORTED:
     MOVE.L  #3, D1         ; Error Code #3
     JSR     ERROR_HANDLER
-    MOVE.B  #14, D0 
-    TRAP    #15 
-    CLR     D0             ;   For the ATOI
-    CLR     D1              
-    CLR      D2
-    CLR     D5  
-    CLR     (SP)           ; Clear the Stack Pointer
-    JMP     WELCOME
 
 OP_INVALID:
     MOVE.L  #4, D1          ; Error Code #4
     JSR     ERROR_HANDLER
-    MOVE.B  #14, D0 
-    TRAP    #15 
-    CLR     D0             ;   For the ATOI
-    CLR     D1              
-    CLR      D2  
-    CLR     D5             ; Clear the loop counter
-    CLR     (SP)           ; Clear the Stack Pointer
-    JMP     WELCOME
+
 *--------------------------------------------------------------------------    
 
 EA_START:
@@ -2150,7 +2129,7 @@ ITOA_BUFFER_CLR_LOOP:
     SUBI    #1, D0
     BGT     ITOA_BUFFER_CLR_LOOP
     RTS
-
+    
 ;----------------------------------------------------------
    
 EA_ERROR:
@@ -2174,9 +2153,9 @@ FINISH_EA:
 ERROR_HANDLER:  
     MULU        #6, D1              ; FOR JUMPING TO DESIGNATED ERROR MSG
     LEA         ERROR_TABLE, A0
-    JSR         0(A0, D1)
-    ;JMP         USER_INPUT         ; To the beginning
-    ;RTS    
+    JSR         0(A0, D1) 
+    MOVE.B      #14, D0                 ; Print the Error
+    TRAP        #15 
     JMP         WELCOME
 
 ERROR_TABLE:
@@ -2294,6 +2273,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
