@@ -44,8 +44,15 @@ USER_INPUT:
     CLR.L   END_ADDRESS ; clean end address
     CLR.L   INPUT_VALUE ; clean user input
     CLR.L   D0 ; clean
-    CLR.L   D3 ; clean flag for end address
+    CLR.L   D1 ; clean flag for end address
     CLR.L   D2 ; clean D2
+    CLR.L   D3
+    CLR.L   D4
+    CLR.L   D5
+    CLR.L   D6
+    CLR.L   D7
+    MOVEA.L #0, A3 ; clean A3
+    ; clean all data register before proceed
     MOVEA.L #0,A1 ; clear A1
     LEA     INPUT_START,A1 ; load message on A1
     MOVE.B  #14,D0 ; read char at A1 until null
