@@ -20,7 +20,6 @@ dstmode_low2        EQU %0000000011000000 ; dest mode lower 2bits
 srcmode_low2        EQU %0000000000011000 ; source mode lower 2 bits
 dstreg              EQU $0E00 ; dest regs
 srcreg              EQU $0007 ; src regs
-
 bufsize             EQU 64 ; 64 characters can be stored in buffer
 right3              EQU 3
 right4              EQU 4
@@ -28,16 +27,12 @@ right8              EQU 8
 right16             EQU 16
 right24             EQU 24
 stack               EQU $A0000
-SAMPLE_ADDR         EQU  $00000400
-
 
     ORG    $1000
     
 START:                  ; first instruction of program
     LEA     stack, SP           ;   SP = stack ($A0000)
     
-    ;MOVE.L  #$E1798102,(A3) ; load test example instruction If you want to test, change this value
-    ;MOVE.W  #$7890, 4(A3)
 WELCOME:
     LEA     WELCOME_MSG,A1
     MOVE.B  #13,D0
@@ -2137,7 +2132,8 @@ ITOA_DONE:
 ;----------------------------------------------------------
    
 EA_ERROR:
-    JMP     EXIT
+    MOVE.W 	#6,D1
+    JMP     ERROR_HANDLER
     
 FINISH_EA:
     ; testing address mode table jump
@@ -2156,7 +2152,7 @@ FINISH_EA:
 ERROR_HANDLER:  
     MULU        #6, D1              ; FOR JUMPING TO DESIGNATED ERROR MSG
     LEA         ERROR_TABLE, A0
-    JMP         0(A0, D1)
+    JSR         0(A0, D1)
     ;JMP         USER_INPUT         ; To the beginning
     ;RTS    
     JMP         WELCOME
@@ -2275,6 +2271,7 @@ END:
 *~Font size~10~
 *~Tab type~1~
 *~Tab size~4~
+
 
 
 
