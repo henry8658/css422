@@ -1,2 +1,2 @@
-# css422
-Dissembler for 68k motorola microprocessor
+# css422 final project
+Disassembler for 68k assembly language
