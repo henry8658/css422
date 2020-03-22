@@ -132,7 +132,6 @@ START:
       RTE
       JMP	    (A6)
       SUBQ.W    #$4, D7
-      EOR.W	    D0, D1
 
       BLS	    $600
       BCC	    $600
